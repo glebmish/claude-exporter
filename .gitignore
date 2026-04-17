@@ -1,0 +1,14 @@
+node_modules/
+
+# Claude Code / agent tooling
+.agents/
+.claude/
+skills-lock.json
+
+dist/
+cli/dist/
+extension/dist/
+
+docs/superpowers/
+
+.worktrees/

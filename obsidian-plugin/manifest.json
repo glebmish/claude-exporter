@@ -1,0 +1,10 @@
+{
+  "id": "claude-exporter",
+  "name": "Claude Exporter",
+  "version": "0.1.0",
+  "minAppVersion": "1.5.0",
+  "description": "Export Claude.ai conversations to your vault.",
+  "author": "Gleb Mishchenko",
+  "authorUrl": "https://github.com/glebmish",
+  "isDesktopOnly": true
+}

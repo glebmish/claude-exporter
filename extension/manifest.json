@@ -1,0 +1,37 @@
+{
+  "manifest_version": 3,
+  "name": "Claude Chat Exporter",
+  "version": "1.0.0",
+  "description": "Export Claude.ai conversations to markdown with optional artifact extraction.",
+  "author": "Gleb Mishchenko",
+  "homepage_url": "https://github.com/glebmish/claude-ai-exporter",
+  "permissions": ["activeTab", "storage", "downloads", "tabs"],
+  "host_permissions": ["https://claude.ai/*"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://claude.ai/*"],
+      "js": ["dist/content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "options_ui": {
+    "page": "settings.html",
+    "open_in_tab": true
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}

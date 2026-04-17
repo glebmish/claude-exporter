@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>Claude Exporter</h1>
+      <a id="settingsLink" class="settings-link" title="Settings">&#9881;</a>
+    </div>
+
+    <div class="options">
+      <label>
+        <input type="checkbox" id="includeArtifacts" checked>
+        Include artifacts
+      </label>
+      <label>
+        <input type="checkbox" id="includeThinking">
+        Include thinking
+      </label>
+      <label>
+        <input type="checkbox" id="includeToolCalls">
+        Include tool calls
+      </label>
+    </div>
+
+    <button id="exportBtn">Export</button>
+    <div id="status"></div>
+  </div>
+
+  <script src="jszip.min.js"></script>
+  <script src="dist/popup.js"></script>
+</body>
+</html>
