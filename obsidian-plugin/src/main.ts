@@ -11,6 +11,8 @@ interface ClaudeExporterSettings {
   artifactsFolder: string;
   chromePath: string;
   templatePath: string;
+  chatNameTemplate: string;
+  artifactNameTemplate: string;
   includeThinking: boolean;
   includeToolCalls: boolean;
   enableToc: boolean;
@@ -22,6 +24,8 @@ const DEFAULT_SETTINGS: ClaudeExporterSettings = {
   artifactsFolder: "attachments",
   chromePath: "",
   templatePath: "",
+  chatNameTemplate: "{{created}}_{{title}}",
+  artifactNameTemplate: "{{seqNum}}_{{title}}",
   includeThinking: false,
   includeToolCalls: false,
   enableToc: false,

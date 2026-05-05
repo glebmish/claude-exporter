@@ -40,6 +40,32 @@ export class ClaudeExporterSettingsTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
+      .setName("Chat file name")
+      .setDesc("Template for the chat note filename (no extension). Variables: {{title}}, {{created}}, {{updated}}, {{exported}}, {{model}}, {{messages}}, {{artifacts}}")
+      .addText((text) =>
+        text
+          .setPlaceholder("{{created}}_{{title}}")
+          .setValue(this.plugin.settings.chatNameTemplate)
+          .onChange(async (value) => {
+            this.plugin.settings.chatNameTemplate = value || "{{created}}_{{title}}";
+            await this.plugin.saveSettings();
+          })
+      );
+
+    new Setting(containerEl)
+      .setName("Artifact file name")
+      .setDesc("Template for artifact filenames (no extension). Variables: {{seqNum}}, {{title}}, {{chatTitle}}, {{chatCreated}}")
+      .addText((text) =>
+        text
+          .setPlaceholder("{{seqNum}}_{{title}}")
+          .setValue(this.plugin.settings.artifactNameTemplate)
+          .onChange(async (value) => {
+            this.plugin.settings.artifactNameTemplate = value || "{{seqNum}}_{{title}}";
+            await this.plugin.saveSettings();
+          })
+      );
+
+    new Setting(containerEl)
       .setName("Note template")
       .setDesc("Vault path to a Markdown template file (e.g. _templates/claude-chat.md). Leave blank to use the built-in format.")
       .addText((text) =>

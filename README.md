@@ -71,6 +71,8 @@ Flags:
 | `--toc-recap` | TOC with per-topic recap |
 | `--topics` | Generate a key-topics list |
 | `--existing <file>` | Merge into an existing export; only new messages are rendered |
+| `--chat-name <tpl>` | Filename template for the chat note (default `{{created}}_{{title}}`) — see "Filename templates" below |
+| `--artifact-name <tpl>` | Filename template for artifacts (default `{{seqNum}}_{{title}}`) |
 | `--debug` | Verbose logging |
 
 ### Chrome extension
@@ -114,6 +116,17 @@ Every exported note is rendered through a template string. The default template 
 | `{{keyTopicsFlat}}` | Key topics as a comma-delimited string (handy for frontmatter tags) |
 
 If `{{content}}` is not present in the template, the rendered content is appended to the end.
+
+### Filename templates
+
+The chat note filename and artifact filenames are also templated. Configurable in Obsidian plugin settings, or via `--chat-name` / `--artifact-name` flags on the CLI:
+
+| Setting | Default | Variables |
+|---|---|---|
+| **Chat file name** | `{{created}}_{{title}}` | `{{title}}`, `{{created}}`, `{{updated}}`, `{{exported}}`, `{{model}}`, `{{messages}}`, `{{artifacts}}` |
+| **Artifact file name** | `{{seqNum}}_{{title}}` | `{{seqNum}}`, `{{title}}`, `{{chatTitle}}`, `{{chatCreated}}` |
+
+Extensions are appended automatically. Unknown variables (e.g. typos like `{{ttile}}`) are left literal in the resulting filename so mistakes are visible. If the template renders empty, the filename falls back to `untitled`.
 
 ## AI enrichment (optional)
 

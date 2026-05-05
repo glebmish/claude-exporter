@@ -23,6 +23,8 @@ interface CliOptions {
   tocRecap: boolean;
   topics: boolean;
   existingFile: string | null;
+  chatNameTemplate: string | null;
+  artifactNameTemplate: string | null;
 }
 
 function parseArgs(argv: string[]): CliOptions {
@@ -38,6 +40,8 @@ function parseArgs(argv: string[]): CliOptions {
     tocRecap: false,
     topics: false,
     existingFile: null,
+    chatNameTemplate: null,
+    artifactNameTemplate: null,
   };
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--output' || args[i] === '-o') {
@@ -54,6 +58,14 @@ function parseArgs(argv: string[]): CliOptions {
     else if (args[i] === '--existing') {
       if (i + 1 >= args.length) { console.error('Error: --existing requires a file path'); process.exit(1); }
       opts.existingFile = args[++i];
+    }
+    else if (args[i] === '--chat-name') {
+      if (i + 1 >= args.length) { console.error('Error: --chat-name requires a template'); process.exit(1); }
+      opts.chatNameTemplate = args[++i];
+    }
+    else if (args[i] === '--artifact-name') {
+      if (i + 1 >= args.length) { console.error('Error: --artifact-name requires a template'); process.exit(1); }
+      opts.artifactNameTemplate = args[++i];
     }
     else if (!args[i].startsWith('-')) { opts.chatUrl = args[i]; }
   }
@@ -87,7 +99,7 @@ async function main(): Promise<void> {
   const opts = parseArgs(process.argv);
   if (opts.debug) log.enable();
   if (!opts.chatUrl) {
-    console.error('Usage: claude-export <chat-url-or-id> [--output <dir>] [--thinking] [--tools] [--no-artifacts] [--toc] [--toc-recap] [--topics] [--existing <file>] [--debug]');
+    console.error('Usage: claude-export <chat-url-or-id> [--output <dir>] [--thinking] [--tools] [--no-artifacts] [--toc] [--toc-recap] [--topics] [--existing <file>] [--chat-name <tpl>] [--artifact-name <tpl>] [--debug]');
     process.exit(1);
   }
   const conversationId = parseConversationId(opts.chatUrl);
@@ -144,7 +156,11 @@ async function main(): Promise<void> {
       includeArtifacts: opts.includeArtifacts,
       includeThinking: opts.includeThinking,
       includeToolCalls: opts.includeToolCalls,
-    }, { conversationId });
+    }, {
+      conversationId,
+      ...(opts.chatNameTemplate ? { chatNameTemplate: opts.chatNameTemplate } : {}),
+      ...(opts.artifactNameTemplate ? { artifactNameTemplate: opts.artifactNameTemplate } : {}),
+    });
 
     let existingToc: TocTopic[] | undefined;
     if (opts.existingFile) {

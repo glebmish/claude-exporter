@@ -5,9 +5,11 @@
 
 import type { Message, MessageBlock, BuildMarkdownOptions, BuildMarkdownContext, BuildMarkdownResult, ConversationResult, RenderedMessage, ArtifactFile, ConversationData, Citation, EnrichmentInput, EnrichmentMessage, EnrichmentBlock, ImageMeta } from "./types.ts";
 import { getFormatter } from "./formatters.ts";
+import { applyFilenameTemplate, DEFAULT_CHAT_NAME_TEMPLATE, DEFAULT_ARTIFACT_NAME_TEMPLATE } from "./filename-template.ts";
 
 export * from "./types.ts";
 export { getFormatter } from "./formatters.ts";
+export { applyFilenameTemplate, DEFAULT_CHAT_NAME_TEMPLATE, DEFAULT_ARTIFACT_NAME_TEMPLATE } from "./filename-template.ts";
 
 // MIME type → file extension mapping
 export const MIME_TO_EXT: Record<string, string> = {
@@ -194,7 +196,11 @@ function extractFirstHeading(content: string): string | null {
   return match?.[1]?.trim() || null;
 }
 
-export function processArtifacts(messages: Message[]): ProcessedArtifacts {
+export function processArtifacts(
+  messages: Message[],
+  artifactNameTemplate: string = DEFAULT_ARTIFACT_NAME_TEMPLATE,
+  chatVars: { chatTitle: string; chatCreated: string } = { chatTitle: "", chatCreated: "" },
+): ProcessedArtifacts {
   const artifacts = new Map<string, ArtifactInternal>();
   const pathToArtifactId = new Map<string, string>();
   let seqNum = 0;
@@ -270,9 +276,13 @@ export function processArtifacts(messages: Message[]): ProcessedArtifacts {
   const result = new Map<string, ArtifactInternal & { filename: string }>();
   for (const [id, art] of artifacts) {
     const ext = getExtFromMime(art.type);
-    const base = sanitizeFilename(art.title);
-    const numStr = String(art.seqNum).padStart(2, "0");
-    const filename = `${numStr}_${base}${ext}`;
+    const base = applyFilenameTemplate(artifactNameTemplate, {
+      seqNum: String(art.seqNum).padStart(2, "0"),
+      title: sanitizeFilename(art.title),
+      chatTitle: chatVars.chatTitle,
+      chatCreated: chatVars.chatCreated,
+    });
+    const filename = `${base}${ext}`;
     result.set(id, { ...art, filename });
   }
   return { artifacts: result, pathToArtifactId };
@@ -446,7 +456,7 @@ export function parseConversation(
   options: BuildMarkdownOptions,
   context: BuildMarkdownContext = {},
 ): ConversationResult {
-  const { conversationId, artifactLinkPrefix, imageLinkPrefix, imageFilenames } = context;
+  const { conversationId, imageFilenames } = context;
   const userName = "You";
   const fmt = getFormatter(options.format || "standard");
   const isObsidian = options.format === "obsidian";
@@ -454,8 +464,12 @@ export function parseConversation(
   const rawMessages = data.chat_messages || [];
   const title = (data.name || "Claude Conversation").replace(/\s*\^archived$/i, "");
   const model = data.model || "unknown";
+  const chatTitleSanitized = sanitizeConversationTitle(data.name);
+  const chatCreatedDate = formatDatePrefix(data.created_at);
+  const artifactNameTemplate = context.artifactNameTemplate ?? DEFAULT_ARTIFACT_NAME_TEMPLATE;
+  const chatNameTemplate = context.chatNameTemplate ?? DEFAULT_CHAT_NAME_TEMPLATE;
   const processed = options.includeArtifacts !== false
-    ? processArtifacts(rawMessages)
+    ? processArtifacts(rawMessages, artifactNameTemplate, { chatTitle: chatTitleSanitized, chatCreated: chatCreatedDate })
     : { artifacts: new Map<string, ArtifactInternal & { filename: string }>(), pathToArtifactId: new Map<string, string>() };
   const artifacts = processed.artifacts;
   const pathToArtifactId = processed.pathToArtifactId;
@@ -464,6 +478,24 @@ export function parseConversation(
   for (const msg of rawMessages) {
     if (msg.sender === "human") humanCount++;
   }
+
+  // Compute datedTitle early so artifactLinkPrefix can be derived from it
+  const exportedDate = new Date().toISOString().substring(0, 10);
+  const datedTitle = applyFilenameTemplate(chatNameTemplate, {
+    title: chatTitleSanitized,
+    created: chatCreatedDate,
+    updated: formatDatePrefix(data.updated_at),
+    exported: exportedDate,
+    model: formatModelName(model),
+    messages: String(humanCount),
+    artifacts: String(artifacts.size),
+  });
+
+  // Derive artifactLinkPrefix from artifactsFolder if caller didn't provide one explicitly
+  const artifactLinkPrefix = context.artifactLinkPrefix
+    ?? (context.artifactsFolder ? `${context.artifactsFolder}/${datedTitle}` : undefined);
+  const imageLinkPrefix = context.imageLinkPrefix
+    ?? ((imageFilenames && imageFilenames.length > 0) ? artifactLinkPrefix : undefined);
 
   const chatUrl = `https://claude.ai/chat/${data.uuid || conversationId || "unknown"}`;
   const citationTracker = new CitationTracker();
@@ -608,17 +640,13 @@ export function parseConversation(
     artifactFiles.push({ filename: art.filename, content, title: art.title, type: art.type, seqNum: art.seqNum });
   }
 
-  const datePrefix = formatDatePrefix(data.created_at);
-  const convTitle = sanitizeConversationTitle(data.name);
-  const datedTitle = datePrefix ? `${datePrefix}_${convTitle}` : convTitle;
-
   return {
     title,
     url: chatUrl,
     model,
     created: formatDatePrefix(data.created_at),
     updated: formatDatePrefix(data.updated_at),
-    exported: new Date().toISOString().substring(0, 10),
+    exported: exportedDate,
     createdTimestamp: formatTimestamp(data.created_at) ?? formatDatePrefix(data.created_at),
     updatedTimestamp: formatTimestamp(data.updated_at) ?? formatDatePrefix(data.updated_at),
     messageCount: humanCount,

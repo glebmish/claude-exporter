@@ -1,5 +1,5 @@
 import { App, TFile, TFolder, normalizePath } from "obsidian";
-import { parseConversation, renderDefault, sanitizeConversationTitle, formatDatePrefix, collectImages, sanitizeFilename, parseConversationId, buildEnrichmentInput } from "../../packages/converter/index.ts";
+import { parseConversation, renderDefault, collectImages, sanitizeFilename, parseConversationId, buildEnrichmentInput } from "../../packages/converter/index.ts";
 import { applyTemplate } from "./template.ts";
 import { enrichWithToc, parseTocFromMarkdown, parseKeyTopicsFromMarkdown, parseKeyTopicsFlatFromTemplate, reuseExistingToc } from "../../packages/toc/index.ts";
 import type { TocTopic } from "../../packages/toc/index.ts";
@@ -42,6 +42,8 @@ interface ExportSettings {
   artifactsFolder: string;
   chromePath: string;
   templatePath: string;
+  chatNameTemplate: string;
+  artifactNameTemplate: string;
   includeThinking: boolean;
   includeToolCalls: boolean;
   enableToc: boolean;
@@ -138,21 +140,15 @@ export async function runExport(
       // 5. Convert
       onStatus("Converting...");
       xlog.info(`Converting "${data.name}" (${data.chat_messages?.length} messages)`);
-      const datePrefix = formatDatePrefix(data.created_at);
-      const convTitle = sanitizeConversationTitle(data.name);
-      const datedTitle = datePrefix ? `${datePrefix}_${convTitle}` : convTitle;
-      const artifactLinkPrefix = normalizePath(
-        `${settings.artifactsFolder}/${datedTitle}`
-      );
-      const imageLinkPrefix = imageFiles.length > 0 ? artifactLinkPrefix : undefined;
       const parsed = parseConversation(
         data,
         { format: "obsidian", includeArtifacts: true, includeThinking: settings.includeThinking, includeToolCalls: settings.includeToolCalls },
         {
           conversationId,
-          artifactLinkPrefix,
-          imageLinkPrefix,
+          artifactsFolder: normalizePath(settings.artifactsFolder),
           imageFilenames: imageFiles.map((f) => ({ msgIndex: f.msgIndex, filename: f.filename })),
+          chatNameTemplate: settings.chatNameTemplate,
+          artifactNameTemplate: settings.artifactNameTemplate,
         }
       );
 

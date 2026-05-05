@@ -50,9 +50,14 @@ export interface BuildMarkdownOptions {
 
 export interface BuildMarkdownContext {
   conversationId?: string;
+  /** Pre-computed link prefix for artifacts (e.g. "attachments/2026-01-15_my_chat"). If absent, derived from artifactsFolder + datedTitle when artifactsFolder is set. */
   artifactLinkPrefix?: string;
   imageLinkPrefix?: string;
   imageFilenames?: Array<{ msgIndex: number; filename: string }>;
+  chatNameTemplate?: string;
+  artifactNameTemplate?: string;
+  /** When set, parseConversation derives artifactLinkPrefix as `${artifactsFolder}/${datedTitle}`. */
+  artifactsFolder?: string;
 }
 
 export interface ArtifactFile {
