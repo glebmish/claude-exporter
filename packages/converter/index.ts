@@ -232,6 +232,12 @@ export function processArtifacts(
               input.new_str as string
             );
           }
+        } else if (input.command === "rewrite") {
+          const existing = artifacts.get(id);
+          if (existing && input.content !== undefined) {
+            existing.content = input.content as string;
+            if (input.md_citations) existing.citations = input.md_citations as Citation[];
+          }
         }
       } else if (block.name === "create_file") {
         const filePath = input.path as string;

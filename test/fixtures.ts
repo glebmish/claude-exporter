@@ -196,6 +196,60 @@ export function makeConversationWithArtifacts(): ConversationData {
   });
 }
 
+/** Conversation where the artifact is rewritten with a fresh full-content version */
+export function makeConversationWithArtifactRewrite(): ConversationData {
+  return makeMinimalConversation({
+    chat_messages: [
+      {
+        uuid: "msg-001",
+        sender: "human",
+        content: [{ type: "text", text: "Write me a script" }],
+        created_at: "2026-01-15T10:00:00Z",
+      },
+      {
+        uuid: "msg-002",
+        sender: "assistant",
+        content: [
+          {
+            type: "tool_use",
+            name: "artifacts",
+            input: {
+              id: "art-001",
+              command: "create",
+              title: "My Script",
+              type: "text/x-python",
+              content: 'print("v1 original")',
+            },
+          },
+        ],
+        created_at: "2026-01-15T10:00:30Z",
+      },
+      {
+        uuid: "msg-003",
+        sender: "human",
+        content: [{ type: "text", text: "Rewrite it from scratch" }],
+        created_at: "2026-01-15T10:01:00Z",
+      },
+      {
+        uuid: "msg-004",
+        sender: "assistant",
+        content: [
+          {
+            type: "tool_use",
+            name: "artifacts",
+            input: {
+              id: "art-001",
+              command: "rewrite",
+              content: 'print("v2 fully rewritten")\nprint("with new line")',
+            },
+          },
+        ],
+        created_at: "2026-01-15T10:01:30Z",
+      },
+    ],
+  });
+}
+
 /** Conversation where create_file replaces an existing artifact */
 export function makeConversationWithCreateFileUpdate(): ConversationData {
   return makeMinimalConversation({

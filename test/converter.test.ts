@@ -30,6 +30,7 @@ import {
   makeConversationWithImages,
   makeConversationWithPreviewAsset,
   makeConversationWithHtmlInTools,
+  makeConversationWithArtifactRewrite,
   makeConversationWithCreateFileUpdate,
   makeConversationWithStandaloneCreateFile,
   makeConversationWithCitations,
@@ -482,6 +483,15 @@ describe("processArtifacts", () => {
     const art = artifacts.values().next().value!;
     assert.ok(art.filename.endsWith(".py"));
     assert.ok(art.filename.startsWith("01 "));
+  });
+
+  it("rewrite command replaces artifact content with the new full version", () => {
+    const data = makeConversationWithArtifactRewrite();
+    const { artifacts } = processArtifacts(data.chat_messages);
+    assert.equal(artifacts.size, 1);
+    const art = artifacts.values().next().value!;
+    assert.ok(art.content.includes("v2 fully rewritten"), "should contain rewritten content");
+    assert.ok(!art.content.includes("v1 original"), "should not retain original content");
   });
 
   it("create_file replaces existing artifact with matching heading", () => {
