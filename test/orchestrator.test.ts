@@ -175,7 +175,7 @@ function buildExistingMarkdown(opts: {
   }
   lines.push("");
   if (opts.keyTopics) {
-    lines.push("## Key Topics");
+    lines.push("## Key topics");
     lines.push("");
     for (const k of opts.keyTopics) lines.push(`- ${k}`);
     lines.push("");
@@ -313,6 +313,114 @@ describe("runExport — refresh path", () => {
       () => runExport({ ...baseOpts, patchInProgress: true }, { fs, cdpOverride: cdp }),
       /requires/,
     );
+  });
+});
+
+describe("runExport — flag-gated default rendering", () => {
+  // baseConversation has 2 messages; existing fixture covers msgs 1–2 with recap + key topics,
+  // so decideEnrichment takes the pure reuseExistingToc path (no AI call).
+  function setup() {
+    const fs = new InMemoryFs();
+    const cdp = makeStubCdp({ conversation: baseConversation });
+    const existingPath = "out/existing.md";
+    fs.preset(existingPath, buildExistingMarkdown({
+      title: "Test Chat",
+      lastCoveredMsg: 2,
+      topics: [{ heading: "Greeting", range: "1–2", recap: "exchanged hellos" }],
+      keyTopics: ["greeting", "small-talk"],
+    }));
+    return { fs, cdp, existingPath };
+  }
+
+  function countOccurrences(text: string, needle: string): number {
+    return text.split(needle).length - 1;
+  }
+
+  it("no flags + reused enrichment → no TOC and no key-topics sections", async () => {
+    const { fs, cdp, existingPath } = setup();
+    const result = await runExport(
+      { ...baseOpts, existingFilePath: existingPath },
+      { fs, cdpOverride: cdp },
+    );
+    const note = fs.read(result.filePath) as string;
+    assert.equal(countOccurrences(note, "## Table of Contents"), 0);
+    assert.equal(countOccurrences(note, "## Key topics"), 0);
+  });
+
+  it("--toc only → exactly one headers TOC, no recap, no key topics", async () => {
+    const { fs, cdp, existingPath } = setup();
+    const result = await runExport(
+      { ...baseOpts, existingFilePath: existingPath, toc: true },
+      { fs, cdpOverride: cdp },
+    );
+    const note = fs.read(result.filePath) as string;
+    assert.equal(countOccurrences(note, "## Table of Contents"), 1);
+    assert.equal(countOccurrences(note, "## Key topics"), 0);
+    // headers-only TOC has no recap sub-bullet
+    assert.ok(!note.includes("exchanged hellos"));
+  });
+
+  it("--toc-recap only → exactly one TOC with recap, no key topics, no duplicate", async () => {
+    const { fs, cdp, existingPath } = setup();
+    const result = await runExport(
+      { ...baseOpts, existingFilePath: existingPath, tocRecap: true },
+      { fs, cdpOverride: cdp },
+    );
+    const note = fs.read(result.filePath) as string;
+    assert.equal(countOccurrences(note, "## Table of Contents"), 1);
+    assert.equal(countOccurrences(note, "## Key topics"), 0);
+    assert.ok(note.includes("exchanged hellos"));
+  });
+
+  it("--toc + --toc-recap → recap wins, exactly one TOC section", async () => {
+    const { fs, cdp, existingPath } = setup();
+    const result = await runExport(
+      { ...baseOpts, existingFilePath: existingPath, toc: true, tocRecap: true },
+      { fs, cdpOverride: cdp },
+    );
+    const note = fs.read(result.filePath) as string;
+    assert.equal(countOccurrences(note, "## Table of Contents"), 1);
+    assert.ok(note.includes("exchanged hellos"));
+  });
+
+  it("--topics only → no TOC, exactly one key-topics section", async () => {
+    const { fs, cdp, existingPath } = setup();
+    const result = await runExport(
+      { ...baseOpts, existingFilePath: existingPath, topics: true },
+      { fs, cdpOverride: cdp },
+    );
+    const note = fs.read(result.filePath) as string;
+    assert.equal(countOccurrences(note, "## Table of Contents"), 0);
+    assert.equal(countOccurrences(note, "## Key topics"), 1);
+    assert.ok(note.includes("- greeting"));
+  });
+
+  it("--toc-recap + --topics → recap TOC + key topics, no duplicate TOC", async () => {
+    const { fs, cdp, existingPath } = setup();
+    const result = await runExport(
+      { ...baseOpts, existingFilePath: existingPath, tocRecap: true, topics: true },
+      { fs, cdpOverride: cdp },
+    );
+    const note = fs.read(result.filePath) as string;
+    assert.equal(countOccurrences(note, "## Table of Contents"), 1);
+    assert.equal(countOccurrences(note, "## Key topics"), 1);
+    assert.ok(note.includes("exchanged hellos"));
+    assert.ok(note.includes("- greeting"));
+  });
+
+  it("template path is unaffected — placeholders gate field emission, no filtering applied", async () => {
+    // Template only references {{tocWithRecap}} — even though enrichment populates
+    // toc/keyTopics too, only the recap placeholder should appear in output.
+    const { fs, cdp, existingPath } = setup();
+    const tpl = "# {{title}}\n\n{{tocWithRecap}}\n\n{{content}}\n";
+    const result = await runExport(
+      { ...baseOpts, existingFilePath: existingPath, tocRecap: true, templateText: tpl },
+      { fs, cdpOverride: cdp },
+    );
+    const note = fs.read(result.filePath) as string;
+    assert.equal(countOccurrences(note, "## Table of Contents"), 1);
+    assert.equal(countOccurrences(note, "## Key topics"), 0);
+    assert.ok(note.includes("exchanged hellos"));
   });
 });
 

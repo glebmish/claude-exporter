@@ -4,7 +4,7 @@ import {
   renderDefault,
   buildEnrichmentInput,
 } from "../converter/index.ts";
-import type { ConversationData } from "../converter/index.ts";
+import type { ConversationData, ConversationResult } from "../converter/index.ts";
 import {
   findChrome,
   isAlreadyRunning,
@@ -33,6 +33,24 @@ export { loadExistingFile, applyInProgressPatch, decideEnrichment } from "./refr
 export type { ExistingFileInfo, EnrichmentDecision, TemplateVarPresence, EnrichmentFlags } from "./refresh.ts";
 
 const TOC_VAR_RE = /\{\{(toc|tocWithRecap|keyTopics|keyTopicsFlat)\}\}/g;
+
+// renderDefault emits every populated TOC/topics field, but the enrichment functions
+// always populate all of them at once. Without a template, the user-facing flags are
+// the only signal for which sections to emit. --toc-recap supersedes --toc (recap is a
+// superset of the headers list, so emitting both is always wrong).
+function filterEnrichmentForDefaultRender(
+  result: ConversationResult,
+  flags: { toc: boolean; tocRecap: boolean; topics: boolean },
+): ConversationResult {
+  const wantToc = flags.toc && !flags.tocRecap;
+  return {
+    ...result,
+    toc: wantToc ? result.toc : undefined,
+    tocWithRecap: flags.tocRecap ? result.tocWithRecap : undefined,
+    keyTopics: flags.topics ? result.keyTopics : undefined,
+    keyTopicsFlat: flags.topics ? result.keyTopicsFlat : undefined,
+  };
+}
 
 function scanTemplateVars(templateText: string | undefined): TemplateVarPresence {
   const flags: TemplateVarPresence = { hasToc: false, hasTocWithRecap: false, hasKeyTopics: false, hasKeyTopicsFlat: false };
@@ -190,9 +208,12 @@ export async function runExport(opts: ExportOptions, deps: ExportDeps): Promise<
   const enriched = decision.enriched;
 
   // Phase 6: render
+  const toRender = opts.templateText
+    ? enriched
+    : filterEnrichmentForDefaultRender(enriched, { toc: opts.toc, tocRecap: opts.tocRecap, topics: opts.topics });
   const markdown = opts.templateText
-    ? applyTemplate(opts.templateText, enriched)
-    : renderDefault(enriched);
+    ? applyTemplate(opts.templateText, toRender)
+    : renderDefault(toRender);
 
   // Phase 7: stale-attachment cleanup
   const hasAttachments = parsed.artifactFiles.length + imageFiles.length > 0;
