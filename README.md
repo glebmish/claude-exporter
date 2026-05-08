@@ -74,11 +74,9 @@ Flags:
 | `--no-images` | Skip inline image fetch (images are fetched by default) |
 | `--thinking` | Include the assistant's thinking blocks |
 | `--tools` | Include tool-call details |
-| `--toc` | Generate an AI table of contents (requires the `claude` CLI to be installed and logged in) |
-| `--toc-recap` | TOC with per-topic recap |
+| `--toc headers\|recap` | AI table of contents — `headers` for plain headings, `recap` for per-topic summaries (requires the `claude` CLI to be installed and logged in) |
 | `--topics` | Generate a key-topics list |
-| `--existing <file>` | Reuse TOC and key-topics from an existing export; stale attachments under the same datedTitle are cleaned |
-| `--patch-in-progress` | While running, patch the `{{exported}}`-bound frontmatter key to `updating` (requires `--existing`) |
+| `--existing <file>` | Reuse TOC and key-topics from an existing export; stale attachments under the same datedTitle are cleaned. While running, the `{{exported}}`-bound frontmatter key is patched to `updating` so concurrent readers don't pick up the stale file |
 | `--json` | Machine-readable single-object stdout; logs go to stderr |
 | `--debug` | Verbose logging to stderr |
 | `--chrome-path <path>` | Path to Chrome binary (env: `CHROME_PATH`) |
@@ -149,7 +147,7 @@ To enable:
 
 - Install the `claude` CLI and log in (`claude` → follow prompts)
 - In the Obsidian plugin, set the path to the `claude` executable in settings (e.g. the output of `which claude`). For the CLI, `claude` just needs to be on `PATH`.
-- Pick which enrichment you want via template variables (`{{toc}}`, `{{tocWithRecap}}`, `{{keyTopics}}`, `{{keyTopicsFlat}}`) or CLI flags (`--toc`, `--toc-recap`, `--topics`)
+- Pick which enrichment you want via template variables (`{{toc}}`, `{{tocWithRecap}}`, `{{keyTopics}}`, `{{keyTopicsFlat}}`) or CLI flags (`--toc headers|recap`, `--topics`). The two surfaces are mutually exclusive: with `--template`, placeholders carry the intent
 
 Incremental re-export: when re-exporting a note that already has a TOC, existing entries are parsed and reused, and the model only runs if new messages were added. This keeps re-exports cheap and stable.
 

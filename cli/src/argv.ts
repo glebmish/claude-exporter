@@ -25,13 +25,11 @@ Content:
       --tools                         Include tool-call details
 
 Enrichment (mutually exclusive with --template; with --template, declare via placeholders):
-      --toc                           AI table of contents
-      --toc-recap                     TOC + per-topic recap
+      --toc headers|recap             AI table of contents (recap adds per-topic summaries)
       --topics                        Key-topics list
 
 Refresh:
-      --existing <md-path>            Existing markdown for TOC reuse
-      --patch-in-progress             Patch {{exported}} key to "updating" during run
+      --existing <md-path>            Existing markdown for TOC reuse (in-progress patch is automatic)
 
 Output:
       --json                          Machine-readable single-object stdout
@@ -59,7 +57,6 @@ interface MutableOpts {
   tocRecap: boolean;
   topics: boolean;
   existingFilePath?: string;
-  patchInProgress: boolean;
   json: boolean;
   debug: boolean;
   chromePath?: string;
@@ -87,7 +84,6 @@ export function parseArgv(args: string[]): ArgvResult {
     toc: false,
     tocRecap: false,
     topics: false,
-    patchInProgress: false,
     json: false,
     debug: false,
   };
@@ -120,14 +116,18 @@ export function parseArgv(args: string[]): ArgvResult {
     else if (a === "--no-images") { o.includeImages = false; }
     else if (a === "--thinking") { o.includeThinking = true; }
     else if (a === "--tools") { o.includeToolCalls = true; }
-    else if (a === "--toc") { o.toc = true; }
-    else if (a === "--toc-recap") { o.tocRecap = true; }
+    else if (a === "--toc") {
+      const v = takeValue(args, i, a); if (typeof v !== "string") return err(v.errMsg);
+      if (v === "headers") { o.toc = true; }
+      else if (v === "recap") { o.tocRecap = true; }
+      else return err(`--toc must be 'headers' or 'recap'`);
+      i++;
+    }
     else if (a === "--topics") { o.topics = true; }
     else if (a === "--existing") {
       const v = takeValue(args, i, a); if (typeof v !== "string") return err(v.errMsg);
       o.existingFilePath = v; i++;
-    } else if (a === "--patch-in-progress") { o.patchInProgress = true; }
-    else if (a === "--json") { o.json = true; }
+    } else if (a === "--json") { o.json = true; }
     else if (a === "--debug") { o.debug = true; }
     else if (a === "--chrome-path") {
       const v = takeValue(args, i, a); if (typeof v !== "string") return err(v.errMsg);
@@ -153,12 +153,12 @@ export function parseArgv(args: string[]): ArgvResult {
   if (o.chatName !== undefined && o.chatNameTemplate !== undefined) {
     return err(`--chat-name and --chat-name-template are mutually exclusive`);
   }
-  if (o.patchInProgress && !o.existingFilePath) {
-    return err(`--patch-in-progress requires --existing`);
-  }
   if (o.templatePath !== undefined && (o.toc || o.tocRecap || o.topics)) {
-    return err(`--toc, --toc-recap, and --topics are not allowed with --template — declare enrichment via {{toc}}, {{tocWithRecap}}, {{keyTopics}}, or {{keyTopicsFlat}} placeholders in the template body`);
+    return err(`--toc and --topics are not allowed with --template — declare enrichment via {{toc}}, {{tocWithRecap}}, {{keyTopics}}, or {{keyTopicsFlat}} placeholders in the template body`);
   }
+
+  // Refresh implies patching the in-progress marker so concurrent readers don't pick up the stale file.
+  const patchInProgress = o.existingFilePath !== undefined;
 
   const opts: ExportOptions = {
     conversationId,
@@ -176,7 +176,7 @@ export function parseArgv(args: string[]): ArgvResult {
     tocRecap: o.tocRecap,
     topics: o.topics,
     ...(o.existingFilePath ? { existingFilePath: o.existingFilePath } : {}),
-    patchInProgress: o.patchInProgress,
+    patchInProgress,
     ...(o.chromePath ? { chromePath: o.chromePath } : {}),
     ...(o.chromePort !== undefined ? { chromePort: o.chromePort } : {}),
   };

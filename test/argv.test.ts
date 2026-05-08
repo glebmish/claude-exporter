@@ -23,7 +23,6 @@ describe("parseArgv", () => {
     assert.equal(r.opts.toc, false);
     assert.equal(r.opts.tocRecap, false);
     assert.equal(r.opts.topics, false);
-    assert.equal(r.opts.patchInProgress, false);
     assert.equal(r.json, false);
     assert.equal(r.debug, false);
   });
@@ -65,20 +64,38 @@ describe("parseArgv", () => {
     if (r.kind === "error") assert.match(r.message, /mutually exclusive/);
   });
 
-  it("--patch-in-progress without --existing → error", () => {
-    const r = parseArgv(["12345678-1234-1234-1234-123456789012", "--patch-in-progress"]);
+  it("--toc headers sets toc:true, tocRecap:false", () => {
+    const r = parseArgv(["12345678-1234-1234-1234-123456789012", "--toc", "headers"]);
+    assert.equal(r.kind, "ok");
+    if (r.kind === "ok") {
+      assert.equal(r.opts.toc, true);
+      assert.equal(r.opts.tocRecap, false);
+    }
+  });
+
+  it("--toc recap sets tocRecap:true, toc:false", () => {
+    const r = parseArgv(["12345678-1234-1234-1234-123456789012", "--toc", "recap"]);
+    assert.equal(r.kind, "ok");
+    if (r.kind === "ok") {
+      assert.equal(r.opts.toc, false);
+      assert.equal(r.opts.tocRecap, true);
+    }
+  });
+
+  it("--toc with bad value → error", () => {
+    const r = parseArgv(["12345678-1234-1234-1234-123456789012", "--toc", "weird"]);
     assert.equal(r.kind, "error");
-    if (r.kind === "error") assert.match(r.message, /existing/);
+    if (r.kind === "error") assert.match(r.message, /headers|recap/);
   });
 
   it("--toc with --template → error", () => {
-    const r = parseArgv(["12345678-1234-1234-1234-123456789012", "--template", "tpl.md", "--toc"]);
+    const r = parseArgv(["12345678-1234-1234-1234-123456789012", "--template", "tpl.md", "--toc", "headers"]);
     assert.equal(r.kind, "error");
     if (r.kind === "error") assert.match(r.message, /template/);
   });
 
-  it("--toc-recap with --template → error", () => {
-    const r = parseArgv(["12345678-1234-1234-1234-123456789012", "--template", "tpl.md", "--toc-recap"]);
+  it("--toc recap with --template → error", () => {
+    const r = parseArgv(["12345678-1234-1234-1234-123456789012", "--template", "tpl.md", "--toc", "recap"]);
     assert.equal(r.kind, "error");
     if (r.kind === "error") assert.match(r.message, /template/);
   });
@@ -94,17 +111,33 @@ describe("parseArgv", () => {
     assert.equal(r.kind, "ok");
   });
 
-  it("--patch-in-progress with --existing → ok", () => {
+  it("--existing implies patchInProgress automatically", () => {
     const r = parseArgv([
       "12345678-1234-1234-1234-123456789012",
       "--existing", "old.md",
-      "--patch-in-progress",
     ]);
     assert.equal(r.kind, "ok");
     if (r.kind === "ok") {
       assert.equal(r.opts.patchInProgress, true);
       assert.equal(r.opts.existingFilePath, "old.md");
     }
+  });
+
+  it("no --existing → patchInProgress stays false", () => {
+    const r = parseArgv(["12345678-1234-1234-1234-123456789012"]);
+    assert.equal(r.kind === "ok" && r.opts.patchInProgress, false);
+  });
+
+  it("--patch-in-progress (legacy) is now unknown → error", () => {
+    const r = parseArgv(["12345678-1234-1234-1234-123456789012", "--patch-in-progress"]);
+    assert.equal(r.kind, "error");
+    if (r.kind === "error") assert.match(r.message, /unknown/i);
+  });
+
+  it("--toc-recap (legacy) is now unknown → error", () => {
+    const r = parseArgv(["12345678-1234-1234-1234-123456789012", "--toc-recap"]);
+    assert.equal(r.kind, "error");
+    if (r.kind === "error") assert.match(r.message, /unknown/i);
   });
 
   it("--json flag sets the json presenter mode", () => {
