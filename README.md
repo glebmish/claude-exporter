@@ -63,17 +63,26 @@ Flags:
 
 | Flag | Meaning |
 |---|---|
-| `--output <dir>`, `-o` | Output directory (default: current dir) |
+| `--output-dir <dir>`, `-o` | Note directory (default: current dir) |
+| `--attachments-dir <dir>` | Override attachments destination (defaults alongside the note) |
+| `--format standard\|obsidian` | Markdown flavor (default: `standard`) |
+| `--template <path>` | Path to a markdown template file (`{{title}}`, `{{header}}`, `{{content}}`, `{{toc}}`, etc.) |
+| `--chat-name <name>` | Literal chat filename (no `{{var}}` substitution) |
+| `--chat-name-template <tpl>` | Templated chat filename (default `{{created}} {{title}}`) — see "Filename templates" below |
+| `--artifact-name-template <tpl>` | Templated artifact filename (default `{{seqNum}} {{title}}`) |
+| `--no-artifacts` | Skip artifact files |
+| `--no-images` | Skip inline image fetch (images are fetched by default) |
 | `--thinking` | Include the assistant's thinking blocks |
 | `--tools` | Include tool-call details |
-| `--no-artifacts` | Skip artifact files |
 | `--toc` | Generate an AI table of contents (requires the `claude` CLI to be installed and logged in) |
 | `--toc-recap` | TOC with per-topic recap |
 | `--topics` | Generate a key-topics list |
-| `--existing <file>` | Merge into an existing export; only new messages are rendered |
-| `--chat-name <tpl>` | Filename template for the chat note (default `{{created}} {{title}}`) — see "Filename templates" below |
-| `--artifact-name <tpl>` | Filename template for artifacts (default `{{seqNum}} {{title}}`) |
-| `--debug` | Verbose logging |
+| `--existing <file>` | Reuse TOC and key-topics from an existing export; stale attachments under the same datedTitle are cleaned |
+| `--patch-in-progress` | While running, patch the `{{exported}}`-bound frontmatter key to `updating` (requires `--existing`) |
+| `--json` | Machine-readable single-object stdout; logs go to stderr |
+| `--debug` | Verbose logging to stderr |
+| `--chrome-path <path>` | Path to Chrome binary (env: `CHROME_PATH`) |
+| `--chrome-port <n>` | CDP port (default 9222) |
 
 ### Chrome extension
 
@@ -119,7 +128,7 @@ If `{{content}}` is not present in the template, the rendered content is appende
 
 ### Filename templates
 
-The chat note filename and artifact filenames are also templated. Configurable in Obsidian plugin settings, or via `--chat-name` / `--artifact-name` flags on the CLI:
+The chat note filename and artifact filenames are also templated. Configurable in Obsidian plugin settings, or via `--chat-name-template` / `--artifact-name-template` flags on the CLI. Use `--chat-name <literal>` to override with an exact filename (no substitution):
 
 | Setting | Default | Variables |
 |---|---|---|
