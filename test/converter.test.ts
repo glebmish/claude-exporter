@@ -4,6 +4,7 @@ import { getFormatter } from "../packages/converter/formatters.ts";
 import {
   sanitizeFilename,
   sanitizeConversationTitle,
+  stripArchivePluginMarkers,
   formatTimestamp,
   formatDatePrefix,
   formatModelName,
@@ -122,6 +123,26 @@ describe("utility functions", () => {
     it("truncates to 50 chars", () => {
       const long = "a".repeat(100);
       assert.equal(sanitizeFilename(long).length, 50);
+    });
+  });
+
+  describe("stripArchivePluginMarkers", () => {
+    it("strips trailing ^archived", () => {
+      assert.equal(stripArchivePluginMarkers("Some chat ^archived"), "Some chat");
+    });
+    it("strips Last message <phrase>", () => {
+      assert.equal(stripArchivePluginMarkers("Title hereLast message 1 month ago"), "Title here");
+    });
+    it("strips both — and handles the NBSP between 'message' and the digit (real Archive-plugin output)", () => {
+      //   is the non-breaking space the Archive plugin captures from the sidebar row.
+      const polluted = "Sourdough hydration experimentsLast message 1 month ago ^archived";
+      assert.equal(
+        stripArchivePluginMarkers(polluted),
+        "Sourdough hydration experiments",
+      );
+    });
+    it("leaves clean titles alone", () => {
+      assert.equal(stripArchivePluginMarkers("Just a normal title"), "Just a normal title");
     });
   });
 

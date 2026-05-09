@@ -62,15 +62,17 @@ export function sanitizeFilename(title: string): string {
  * Workaround for the unofficial "Chat Archive" browser extension/plugin: when it
  * archives a chat it captures the sidebar row's textContent (which includes the
  * "Last message X ago" time-ago label) into the conversation `name` and appends
- * ` ^archived`. Result: `<title>Last message N <unit> ago ^archived`. This is
- * NOT a Claude.ai bug — it is data damage caused by the third-party plugin and
- * it is permanent in stored chat names. We strip both markers so exported notes
- * have clean titles.
+ * ` ^archived`. Result: `<title>Last message N <unit> ago ^archived`, with a
+ * non-breaking space (U+00A0) between "message" and the digit because that's
+ * how the sidebar row renders the gap. Both markers are stripped here — using
+ * `\s` so the regex matches NBSP as well as ordinary spaces. Not a Claude.ai
+ * bug — purely data damage caused by the third-party plugin and baked into
+ * stored chat names.
  */
 export function stripArchivePluginMarkers(name: string): string {
   return name
     .replace(/\s*\^archived$/i, "")
-    .replace(/Last message .*$/i, "")
+    .replace(/Last\s+message\s+.*$/i, "")
     .trimEnd();
 }
 
