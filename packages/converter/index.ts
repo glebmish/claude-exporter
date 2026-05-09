@@ -360,8 +360,26 @@ export function parseConversation(
   const chatNameTemplate = context.chatNameTemplate ?? DEFAULT_CHAT_NAME_TEMPLATE;
   // Map sandbox-file paths to their basename so tool_use callouts can link to files.
   const sandboxFiles = options.includeArtifacts !== false ? (context.sandboxFiles ?? []) : [];
-  const sandboxFileByPath = new Map<string, { filename: string; relativeWritePath: string }>();
-  for (const f of sandboxFiles) sandboxFileByPath.set(f.path, { filename: f.filename, relativeWritePath: f.relativeWritePath });
+  type SandboxEntry = { filename: string; relativeWritePath: string };
+  const sandboxFileByPath = new Map<string, SandboxEntry>();
+  // Wiggle lists files under /mnt/user-data/outputs/, but Claude's tool calls increasingly
+  // reference the same files via their sandbox-shell path (/home/claude/...). Index by
+  // basename so we still link the wikilink when only the directory differs.
+  const sandboxFileByBasename = new Map<string, SandboxEntry>();
+  for (const f of sandboxFiles) {
+    const entry = { filename: f.filename, relativeWritePath: f.relativeWritePath };
+    sandboxFileByPath.set(f.path, entry);
+    const idx = f.path.lastIndexOf("/");
+    const base = idx === -1 ? f.path : f.path.slice(idx + 1);
+    if (!sandboxFileByBasename.has(base)) sandboxFileByBasename.set(base, entry);
+  }
+  const lookupSandboxFile = (p: string): SandboxEntry | undefined => {
+    const direct = sandboxFileByPath.get(p);
+    if (direct) return direct;
+    const idx = p.lastIndexOf("/");
+    const base = idx === -1 ? p : p.slice(idx + 1);
+    return sandboxFileByBasename.get(base);
+  };
 
   let humanCount = 0;
   for (const msg of rawMessages) {
@@ -464,14 +482,18 @@ export function parseConversation(
       }
 
       let toolCalls: string[] = [];
-      // File paths touched by tool_use blocks in this message (insertion order, deduped),
-      // for emitting wikilinks at end of the assistant message body.
-      const linkedPaths: string[] = [];
+      // Sandbox files touched by tool_use blocks in this message (insertion order, deduped
+      // by on-disk relativeWritePath so a single file referenced via multiple sandbox paths
+      // — e.g. /home/claude/foo.md by create_file and /mnt/user-data/outputs/foo.md by
+      // present_files — links exactly once at the end of the assistant message body.
+      const linkedFiles: SandboxEntry[] = [];
       const linkedSeen = new Set<string>();
       const linkPath = (p: string | undefined): void => {
-        if (!p || !sandboxFileByPath.has(p) || linkedSeen.has(p)) return;
-        linkedSeen.add(p);
-        linkedPaths.push(p);
+        if (!p) return;
+        const entry = lookupSandboxFile(p);
+        if (!entry || linkedSeen.has(entry.relativeWritePath)) return;
+        linkedSeen.add(entry.relativeWritePath);
+        linkedFiles.push(entry);
       };
 
       const flushToolCalls = () => {
@@ -513,13 +535,12 @@ export function parseConversation(
 
       flushToolCalls();
 
-      // Emit one wikilink per unique file path the tool_use blocks touched, at the end of the message.
+      // Emit one wikilink per unique file the tool_use blocks touched, at the end of the message.
       // The standard formatter resolves the link URL via `<prefix>/<relativeWritePath>` so uploads
       // (which sit at `<datedTitle>/uploads/foo.png`) point at the right on-disk location;
       // the obsidian formatter ignores the prefix and resolves by basename.
       if (options.includeArtifacts !== false) {
-        for (const p of linkedPaths) {
-          const entry = sandboxFileByPath.get(p)!;
+        for (const entry of linkedFiles) {
           bodyLines.push(fmt.artifactLink(entry.relativeWritePath, entry.filename, attachmentLinkPrefix));
           bodyLines.push("");
         }
