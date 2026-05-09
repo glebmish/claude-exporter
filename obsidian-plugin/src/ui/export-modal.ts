@@ -2,6 +2,7 @@ import { App, Modal, Setting, Notice } from "obsidian";
 import { parseConversationId } from "../../../packages/converter/index.ts";
 import { runExport, browseAndPick, type ExportSettings } from "../export";
 import { CdpClient, shutdownChrome } from "../../../packages/chrome/index.ts";
+import { StageError } from "../../../packages/orchestrator/index.ts";
 import { RefreshAllModal } from "./refresh-all-modal";
 
 export class ExportModal extends Modal {
@@ -109,7 +110,13 @@ export class ExportModal extends Modal {
         }
       } catch (e: unknown) {
         const msg = e instanceof Error ? e.message : String(e);
-        if (msg !== "Cancelled") {
+        if (msg === "Cancelled") {
+          // silent — user-initiated
+        } else if (e instanceof StageError && e.stage === "not_found") {
+          statusEl.textContent = "Chat not found in Claude — skipped.";
+          statusEl.style.color = "var(--text-muted)";
+          new Notice("Chat not found in Claude — skipped.");
+        } else {
           statusEl.textContent = `Error: ${msg}`;
           statusEl.style.color = "var(--text-error)";
           new Notice(`Export failed: ${msg}`);
@@ -158,7 +165,13 @@ export class ExportModal extends Modal {
         }
       } catch (e: unknown) {
         const msg = e instanceof Error ? e.message : String(e);
-        if (msg !== "Cancelled") {
+        if (msg === "Cancelled") {
+          // silent
+        } else if (e instanceof StageError && e.stage === "not_found") {
+          statusEl.textContent = "Chat not found in Claude — skipped.";
+          statusEl.style.color = "var(--text-muted)";
+          new Notice("Chat not found in Claude — skipped.");
+        } else {
           statusEl.textContent = `Error: ${msg}`;
           statusEl.style.color = "var(--text-error)";
           new Notice(`Export failed: ${msg}`);

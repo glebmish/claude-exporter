@@ -2,6 +2,7 @@ export type ErrorStage =
   | "cancelled"
   | "cdp"
   | "conversation"
+  | "not_found"
   | "filesystem"
   | "auth"
   | "usage";

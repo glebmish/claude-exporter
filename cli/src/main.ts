@@ -77,7 +77,10 @@ async function main(): Promise<number> {
   } catch (e: unknown) {
     const { stage, message } = classifyError(e);
     presenter.error(stage, message);
-    return stage === "cancelled" ? 130 : 1;
+    if (stage === "cancelled") return 130;
+    // not_found is a benign skip (chat deleted/never existed) — no output written, exit 0.
+    if (stage === "not_found") return 0;
+    return 1;
   } finally {
     process.off("SIGINT", onSigint);
   }

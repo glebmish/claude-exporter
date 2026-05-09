@@ -1,8 +1,9 @@
 import { App, Modal, TFile, Notice } from "obsidian";
+import { StageError } from "../../../packages/orchestrator/index.ts";
 import { runExport, type ExportSettings } from "../export";
 import { getConversationIdFromFrontmatter } from "./refresh-button";
 
-type EntryStatus = "pending" | "running" | "done" | "error";
+type EntryStatus = "pending" | "running" | "done" | "skipped" | "error";
 
 interface FileEntry {
   file: TFile;
@@ -164,6 +165,7 @@ export class RefreshAllModal extends Modal {
 
     const selected = this.entries.filter((e) => e.selected);
     let doneCount = 0;
+    let skippedCount = 0;
     let errorCount = 0;
 
     for (const entry of selected) {
@@ -192,6 +194,9 @@ export class RefreshAllModal extends Modal {
         const msg = err instanceof Error ? err.message : String(err);
         if (msg === "Cancelled") {
           this.setEntryStatus(entry, "error", "Aborted");
+        } else if (err instanceof StageError && err.stage === "not_found") {
+          this.setEntryStatus(entry, "skipped", "⊘ Not in Claude — skipped");
+          skippedCount++;
         } else {
           this.setEntryStatus(entry, "error", `Error: ${msg}`);
           errorCount++;
@@ -202,10 +207,10 @@ export class RefreshAllModal extends Modal {
     cancelBtn.textContent = "Close";
     setCancelHandler(() => this.close());
 
-    const summary = errorCount > 0
-      ? `Refreshed ${doneCount}, ${errorCount} failed`
-      : `Refreshed ${doneCount} chat${doneCount !== 1 ? "s" : ""}`;
-    new Notice(summary);
+    const parts = [`Refreshed ${doneCount}`];
+    if (skippedCount > 0) parts.push(`${skippedCount} skipped (not in Claude)`);
+    if (errorCount > 0) parts.push(`${errorCount} failed`);
+    new Notice(parts.join(", "));
   }
 
   private setEntryStatus(entry: FileEntry, status: EntryStatus, text: string) {
@@ -217,6 +222,8 @@ export class RefreshAllModal extends Modal {
         ? "var(--color-green)"
         : status === "error"
         ? "var(--text-error)"
+        : status === "skipped"
+        ? "var(--text-faint)"
         : "var(--text-muted)";
   }
 

@@ -1,5 +1,6 @@
 import { App, Notice, Plugin, WorkspaceLeaf, MarkdownView } from "obsidian";
 import { parseConversationId } from "../../../packages/converter/index.ts";
+import { StageError } from "../../../packages/orchestrator/index.ts";
 import { runExport, type ExportSettings } from "../export";
 
 // Claude logo centered inside circular refresh arrows
@@ -121,8 +122,12 @@ function injectButton(
         : `${result.messageCount} messages`;
       new Notice(`Exported "${result.title}" (${msgSummary})`);
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      new Notice(`Export failed: ${msg}`);
+      if (err instanceof StageError && err.stage === "not_found") {
+        new Notice("Chat no longer in Claude — skipped (existing note left untouched).");
+      } else {
+        const msg = err instanceof Error ? err.message : String(err);
+        new Notice(`Export failed: ${msg}`);
+      }
     } finally {
       btn.removeClass("is-spinning");
       btn.setAttribute("aria-label", "Re-export from Claude");

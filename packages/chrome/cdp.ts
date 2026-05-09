@@ -107,12 +107,20 @@ export class CdpClient {
   }
 
   async evaluate(expression: string): Promise<unknown> {
-    const result = (await this.send("Runtime.evaluate", {
+    const reply = (await this.send("Runtime.evaluate", {
       expression,
       returnByValue: true,
       awaitPromise: true,
-    })) as { result: { value: unknown } };
-    return result.result.value;
+    })) as {
+      result: { value: unknown };
+      exceptionDetails?: { exception?: { description?: string }; text?: string };
+    };
+    if (reply.exceptionDetails) {
+      const ex = reply.exceptionDetails.exception;
+      const desc = ex?.description ?? reply.exceptionDetails.text ?? "page-side error";
+      throw new Error(desc);
+    }
+    return reply.result.value;
   }
 
   async navigateTo(url: string, timeoutMs = 30000): Promise<void> {
@@ -151,16 +159,24 @@ export class CdpClient {
   }
 
   async fetchConversation(conversationId: string): Promise<unknown> {
-    return this.evaluate(`
-      (function() {
-        var m = document.cookie.match(/lastActiveOrg=([^;]+)/);
-        if (!m) throw new Error("Not logged in: lastActiveOrg cookie missing");
-        return fetch("/api/organizations/" + m[1] +
-              "/chat_conversations/" + ${JSON.stringify(conversationId)} + "?tree=true&rendering_mode=messages&render_all_tools=true",
-              { credentials: "include", headers: { "Content-Type": "application/json" } })
-          .then(r => { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); });
-      })()
-    `);
+    try {
+      return await this.evaluate(`
+        (function() {
+          var m = document.cookie.match(/lastActiveOrg=([^;]+)/);
+          if (!m) throw new Error("Not logged in: lastActiveOrg cookie missing");
+          return fetch("/api/organizations/" + m[1] +
+                "/chat_conversations/" + ${JSON.stringify(conversationId)} + "?tree=true&rendering_mode=messages&render_all_tools=true",
+                { credentials: "include", headers: { "Content-Type": "application/json" } })
+            .then(r => { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); });
+        })()
+      `);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (/HTTP 404/.test(msg)) {
+        throw new StageError("not_found", `Conversation ${conversationId} not found in Claude (deleted or never existed).`);
+      }
+      throw e;
+    }
   }
 
   async fetchImageAsDataUrl(url: string): Promise<string | null> {
