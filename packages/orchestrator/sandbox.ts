@@ -1,7 +1,14 @@
 /**
  * Fetches the conversation's live sandbox files from the wiggle store and
- * decodes them to text or binary. The sandbox is the source of truth for
- * exported file content — tool_use blocks are never replayed.
+ * decodes them to text or binary. The wiggle store is the source of truth for
+ * filesystem-backed artifacts (anything written via create_file, etc.).
+ *
+ * Research artifacts (the `artifacts` tool with `compass_artifact_wf-…` IDs)
+ * are NOT stored as wiggle files — they're rendered Claude-side. Their bodies
+ * live in the conversation API (`tool_use.input.content` on the create block)
+ * and are replayed by the converter; this module exposes a helper to wrap a
+ * `ResearchArtifact` as a `SandboxFileContent` so phase 8 writes them next to
+ * wiggle artifacts and the converter links them with the same machinery.
  */
 
 import type { CdpFacade } from "./types.ts";
@@ -10,6 +17,8 @@ import {
   sanitizeForFilename,
   DEFAULT_ARTIFACT_NAME_TEMPLATE,
 } from "../converter/filename-template.ts";
+import { getExtFromMime } from "../converter/index.ts";
+import type { ResearchArtifact } from "../converter/index.ts";
 
 export type SandboxFileKind = "artifact" | "upload";
 
@@ -21,7 +30,9 @@ export interface SandboxFileNamingContext {
 }
 
 export interface SandboxFileContent {
-  /** Full sandbox path, e.g. `/mnt/user-data/outputs/02-shape.md` */
+  /** Full sandbox path, e.g. `/mnt/user-data/outputs/02-shape.md`. For replayed
+   * research artifacts (which have no real sandbox path) this is a synthetic
+   * `research-artifact:<id>` placeholder used only to keep entries unique. */
   path: string;
   /** Basename (with extension), used both as on-disk filename and wikilink target */
   filename: string;
@@ -37,6 +48,9 @@ export interface SandboxFileContent {
   /** 1-based, ordered by createdAt across the whole sandbox */
   seqNum: number;
   kind: SandboxFileKind;
+  /** Set for replayed research artifacts; matches `tool_use.input.id` so the
+   * converter can emit a wikilink without needing a path on the tool block. */
+  artifactId?: string;
 }
 
 const TEXT_PREFIXES = ["text/", "application/json", "application/xml", "application/javascript"];
@@ -206,4 +220,48 @@ export async function fetchSandboxFiles(
   }
 
   return { files: result, warnings };
+}
+
+/**
+ * Materialize replayed research artifacts as `SandboxFileContent` entries so
+ * they participate in the same naming/writing/linking flow as wiggle artifacts.
+ * `seqStart` is the next available seqNum (continues from wiggle's last) so the
+ * artifact-name template's {{seqNum}} stays unique across both sources.
+ */
+export function researchArtifactsAsSandboxFiles(
+  artifacts: ResearchArtifact[],
+  naming: SandboxFileNamingContext,
+  seqStart: number,
+): SandboxFileContent[] {
+  const result: SandboxFileContent[] = [];
+  let seqNum = seqStart;
+  for (const art of artifacts) {
+    seqNum++;
+    const ext = getExtFromMime(art.mimeType);
+    const template = naming.artifactNameTemplate ?? DEFAULT_ARTIFACT_NAME_TEMPLATE;
+    const base = applyFilenameTemplate(template, {
+      seqNum: String(seqNum).padStart(2, "0"),
+      title: sanitizeForFilename(art.title),
+      titleSanitized: sanitizeForFilename(art.title).toLowerCase().replace(/\s+/g, "_").slice(0, 50),
+      chatTitle: naming.chatTitle,
+      chatTitleSanitized: naming.chatTitleSanitized,
+      chatCreated: naming.chatCreated,
+    });
+    const filename = `${base}${ext}`;
+    result.push({
+      // Synthetic: research artifacts have no real sandbox path. The artifactId
+      // field is what the converter matches against tool_use.input.id.
+      path: `research-artifact:${art.id}`,
+      filename,
+      relativeWritePath: filename,
+      contentType: art.mimeType || "text/plain",
+      isBinary: false,
+      text: art.content,
+      createdAt: "",
+      seqNum,
+      kind: "artifact",
+      artifactId: art.id,
+    });
+  }
+  return result;
 }

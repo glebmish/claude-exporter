@@ -5,6 +5,7 @@ import {
   buildEnrichmentInput,
   sanitizeConversationTitle,
   stripArchivePluginMarkers,
+  replayResearchArtifacts,
 } from "../converter/index.ts";
 import type { ConversationData, ConversationResult } from "../converter/index.ts";
 import { sanitizeForFilename } from "../converter/filename-template.ts";
@@ -27,7 +28,7 @@ import {
   type ExistingFileInfo,
   type TemplateVarPresence,
 } from "./refresh.ts";
-import { fetchSandboxFiles } from "./sandbox.ts";
+import { fetchSandboxFiles, researchArtifactsAsSandboxFiles } from "./sandbox.ts";
 import type { SandboxFileContent } from "./sandbox.ts";
 import { StageError } from "./errors.ts";
 
@@ -121,6 +122,25 @@ function computeNamingContext(opts: ExportOptions, data: ConversationData): impo
   };
 }
 
+function mergeResearchArtifacts(
+  opts: ExportOptions,
+  data: ConversationData,
+  wiggleFiles: SandboxFileContent[],
+  wiggleWarnings: string[],
+): { sandboxFiles: SandboxFileContent[]; sandboxWarnings: string[] } {
+  const replay = replayResearchArtifacts(data.chat_messages || []);
+  const lastSeq = wiggleFiles.reduce((max, f) => Math.max(max, f.seqNum), 0);
+  const replayed = researchArtifactsAsSandboxFiles(
+    replay.artifacts,
+    computeNamingContext(opts, data),
+    lastSeq,
+  );
+  return {
+    sandboxFiles: [...wiggleFiles, ...replayed],
+    sandboxWarnings: [...wiggleWarnings, ...replay.warnings],
+  };
+}
+
 async function fetchData(
   opts: ExportOptions,
   deps: ExportDeps,
@@ -132,10 +152,13 @@ async function fetchData(
     const imageFiles = opts.includeImages
       ? await fetchAllImages(deps.cdpOverride, messages, deps.onStatus, deps.signal)
       : [];
-    const sandbox = opts.includeArtifacts
+    const wiggle = opts.includeArtifacts
       ? await fetchSandboxFiles(deps.cdpOverride, opts.conversationId, computeNamingContext(opts, data), { onStatus: deps.onStatus, signal: deps.signal })
       : { files: [], warnings: [] };
-    return { data, imageFiles, sandboxFiles: sandbox.files, sandboxWarnings: sandbox.warnings };
+    const merged = opts.includeArtifacts
+      ? mergeResearchArtifacts(opts, data, wiggle.files, wiggle.warnings)
+      : { sandboxFiles: wiggle.files, sandboxWarnings: wiggle.warnings };
+    return { data, imageFiles, sandboxFiles: merged.sandboxFiles, sandboxWarnings: merged.sandboxWarnings };
   }
   return withCdp(opts, deps, async (cdp) => {
     if (deps.signal?.aborted) throw new Error("Cancelled");
@@ -145,10 +168,13 @@ async function fetchData(
     const imageFiles = opts.includeImages
       ? await fetchAllImages(cdp, messages, deps.onStatus, deps.signal)
       : [];
-    const sandbox = opts.includeArtifacts
+    const wiggle = opts.includeArtifacts
       ? await fetchSandboxFiles(cdp, opts.conversationId, computeNamingContext(opts, data), { onStatus: deps.onStatus, signal: deps.signal })
       : { files: [], warnings: [] };
-    return { data, imageFiles, sandboxFiles: sandbox.files, sandboxWarnings: sandbox.warnings };
+    const merged = opts.includeArtifacts
+      ? mergeResearchArtifacts(opts, data, wiggle.files, wiggle.warnings)
+      : { sandboxFiles: wiggle.files, sandboxWarnings: wiggle.warnings };
+    return { data, imageFiles, sandboxFiles: merged.sandboxFiles, sandboxWarnings: merged.sandboxWarnings };
   });
 }
 
@@ -182,7 +208,12 @@ export async function runExport(opts: ExportOptions, deps: ExportDeps): Promise<
     {
       conversationId: opts.conversationId,
       imageFilenames: imageFiles.map((f) => ({ msgIndex: f.msgIndex, filename: f.filename })),
-      sandboxFiles: sandboxFiles.map((f) => ({ path: f.path, filename: f.filename, relativeWritePath: f.relativeWritePath })),
+      sandboxFiles: sandboxFiles.map((f) => ({
+        path: f.path,
+        filename: f.filename,
+        relativeWritePath: f.relativeWritePath,
+        ...(f.artifactId ? { artifactId: f.artifactId } : {}),
+      })),
       ...(opts.chatName !== undefined ? { chatName: opts.chatName } : {}),
       ...(opts.chatNameTemplate !== undefined ? { chatNameTemplate: opts.chatNameTemplate } : {}),
     },

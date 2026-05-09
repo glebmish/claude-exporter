@@ -93,22 +93,11 @@ describe("runExport — basic export", () => {
 });
 
 describe("runExport — attachments layout", () => {
-  const conversationWithArtifact = {
-    ...baseConversation,
-    chat_messages: [
-      ...baseConversation.chat_messages,
-      {
-        uuid: "m3",
-        sender: "assistant" as const,
-        content: [{
-          type: "tool_use",
-          name: "artifacts",
-          input: { id: "art1", command: "create", title: "Plan", type: "text/markdown", content: "# Plan\nbody" },
-        }],
-        created_at: "2026-01-15T10:00:02Z",
-      },
-    ],
-  };
+  // Layout fixture: the artifact comes purely from wiggle (the sandbox file
+  // below). Real-world research-artifact tool_use blocks (compass_artifact_wf)
+  // never overlap with a wiggle file at the same path, so the fixture mirrors
+  // a chat where the artifact was created via create_file or similar.
+  const conversationWithArtifact = baseConversation;
 
   const sandboxFiles = [
     {
@@ -190,6 +179,87 @@ describe("runExport — attachments layout", () => {
     assert.ok(!body.includes("REPLAY_ME"), "exported artifact must NOT carry tool_use input.content");
     const note = (await fs.readText(result.filePath))!;
     assert.ok(!note.includes("REPLAY_ME — must not"), "conversation markdown must not surface full input.file_text");
+  });
+
+  it("research artifact (compass_artifact_wf via artifacts:create) is replayed to a file and linked from the chat note", async () => {
+    const conv = {
+      ...baseConversation,
+      chat_messages: [
+        ...baseConversation.chat_messages,
+        {
+          uuid: "m_research",
+          sender: "assistant" as const,
+          content: [
+            { type: "text", text: "Here's the report." },
+            {
+              type: "tool_use",
+              name: "artifacts",
+              input: {
+                id: "compass_artifact_wf-abc123_text/markdown",
+                command: "create",
+                title: "Hybrid PKM Architecture",
+                type: "text/markdown",
+                content: "# Hybrid PKM Architecture\n\nFull body of the research report.",
+              },
+            },
+          ],
+          created_at: "2026-01-15T10:00:02Z",
+        },
+      ],
+    };
+    const fs = new InMemoryFs();
+    const cdp = makeStubCdp({ conversation: conv, sandboxFiles: [] });
+    const result = await runExport({ ...baseOpts, includeToolCalls: true }, { fs, cdpOverride: cdp });
+    // Replayed artifact file exists alongside the note.
+    const artifactFile = fs.list().find((p) => p.endsWith(".md") && p !== result.filePath);
+    assert.ok(artifactFile, "expected the replayed research artifact to be written as a file");
+    const body = (await fs.readText(artifactFile!))!;
+    assert.ok(body.includes("Full body of the research report"));
+    // Chat note links to it (standard formatter emits a `[Artifact: …](…)` link).
+    const note = (await fs.readText(result.filePath))!;
+    const baseName = artifactFile!.split("/").pop()!.replace(/\.md$/, "");
+    assert.ok(note.includes(baseName), `chat note must link to the artifact file (${baseName})`);
+  });
+
+  it("update/rewrite commands on artifacts produce a warning and are otherwise ignored", async () => {
+    const conv = {
+      ...baseConversation,
+      chat_messages: [
+        ...baseConversation.chat_messages,
+        {
+          uuid: "m_create",
+          sender: "assistant" as const,
+          content: [{
+            type: "tool_use",
+            name: "artifacts",
+            input: { id: "art-id-1", command: "create", title: "Doc", type: "text/markdown", content: "v1" },
+          }],
+          created_at: "2026-01-15T10:00:02Z",
+        },
+        {
+          uuid: "m_update",
+          sender: "assistant" as const,
+          content: [{
+            type: "tool_use",
+            name: "artifacts",
+            input: { id: "art-id-1", command: "update", old_str: "v1", new_str: "v2" },
+          }],
+          created_at: "2026-01-15T10:00:03Z",
+        },
+      ],
+    };
+    const fs = new InMemoryFs();
+    const cdp = makeStubCdp({ conversation: conv, sandboxFiles: [] });
+    const result = await runExport(baseOpts, { fs, cdpOverride: cdp });
+    const artifactFile = fs.list().find((p) => p.endsWith(".md") && p !== result.filePath);
+    assert.ok(artifactFile);
+    const body = (await fs.readText(artifactFile!))!;
+    // Body reflects the create only — the update is ignored.
+    assert.ok(body.includes("v1") && !body.includes("v2"));
+    assert.ok(
+      result.warnings.some((w) => /update.*not supported/i.test(w)),
+      `expected an update-not-supported warning, got: ${result.warnings.join(" | ")}`,
+    );
   });
 
   it("uploads land in the uploads/ subdir under the dated-title folder", async () => {

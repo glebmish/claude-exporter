@@ -178,6 +178,69 @@ export function toolResultSummary(block: MessageBlock): string {
   return "ok";
 }
 
+/**
+ * Replayed research artifact — reconstructed from `artifacts` tool_use blocks
+ * in the conversation. The body is sourced from `input.content` of the `create`
+ * block; subsequent `update` / `rewrite` commands are intentionally NOT applied
+ * (only `create` is supported today — see `replayResearchArtifacts`).
+ */
+export interface ResearchArtifact {
+  id: string;
+  title: string;
+  /** MIME type from `input.type` (e.g. "text/markdown"). */
+  mimeType: string;
+  content: string;
+}
+
+/**
+ * Walk the conversation's `artifacts` tool_use blocks and collect the body of
+ * each `command="create"` block. Wiggle's sandbox listing does not include
+ * research artifacts (they're rendered Claude-side, not stored as files), so
+ * the conversation API is the only source — the artifact's full markdown body
+ * lives in the create block's `input.content`.
+ *
+ * Only `create` is handled today; `update` and `rewrite` (and any other future
+ * command) are reported via the warnings channel and otherwise ignored, so the
+ * caller can surface that something was lost. In current data only `create`
+ * occurs for research artifacts; updates/rewrites historically appeared on the
+ * canvas/code artifact tool, not on `compass_artifact_wf-…` research outputs.
+ */
+export function replayResearchArtifacts(
+  messages: Message[],
+): { artifacts: ResearchArtifact[]; warnings: string[] } {
+  const artifacts: ResearchArtifact[] = [];
+  const warnings: string[] = [];
+  const seen = new Set<string>();
+  for (const msg of messages) {
+    if (msg.sender !== "assistant") continue;
+    for (const block of msg.content || []) {
+      if (block.type !== "tool_use" || block.name !== "artifacts") continue;
+      const input = block.input || {};
+      const id = typeof input.id === "string" ? input.id : "";
+      if (!id) continue;
+      const command = typeof input.command === "string" ? input.command : "";
+      if (command === "create") {
+        if (seen.has(id)) {
+          warnings.push(`research artifact ${id}: duplicate "create" command — keeping first`);
+          continue;
+        }
+        seen.add(id);
+        artifacts.push({
+          id,
+          title: typeof input.title === "string" && input.title ? input.title : "untitled",
+          mimeType: typeof input.type === "string" && input.type ? input.type : "text/plain",
+          content: typeof input.content === "string" ? input.content : "",
+        });
+      } else if (command === "update" || command === "rewrite") {
+        warnings.push(`research artifact ${id}: "${command}" command not supported — patch ignored, exported body reflects the original "create" only`);
+      } else {
+        warnings.push(`research artifact ${id}: unknown command "${command}" ignored`);
+      }
+    }
+  }
+  return { artifacts, warnings };
+}
+
 export function collectImages(messages: Message[]): ImageMeta[] {
   const images: ImageMeta[] = [];
   for (let i = 0; i < messages.length; i++) {
@@ -366,12 +429,16 @@ export function parseConversation(
   // reference the same files via their sandbox-shell path (/home/claude/...). Index by
   // basename so we still link the wikilink when only the directory differs.
   const sandboxFileByBasename = new Map<string, SandboxEntry>();
+  // Replayed research artifacts are linked by their `compass_artifact_wf-…` id —
+  // the `artifacts` tool_use block has an id but no path/filepaths to match on.
+  const sandboxFileByArtifactId = new Map<string, SandboxEntry>();
   for (const f of sandboxFiles) {
     const entry = { filename: f.filename, relativeWritePath: f.relativeWritePath };
     sandboxFileByPath.set(f.path, entry);
     const idx = f.path.lastIndexOf("/");
     const base = idx === -1 ? f.path : f.path.slice(idx + 1);
     if (!sandboxFileByBasename.has(base)) sandboxFileByBasename.set(base, entry);
+    if (f.artifactId) sandboxFileByArtifactId.set(f.artifactId, entry);
   }
   const lookupSandboxFile = (p: string): SandboxEntry | undefined => {
     const direct = sandboxFileByPath.get(p);
@@ -523,6 +590,15 @@ export function parseConversation(
           if (Array.isArray(input.filepaths)) {
             for (const fp of input.filepaths) {
               if (typeof fp === "string") linkPath(fp);
+            }
+          }
+          // Research artifacts (the `artifacts` tool) have no path/filepaths in
+          // their input, only an id — link via the replay-populated id index.
+          if (block.name === "artifacts" && typeof input.id === "string") {
+            const entry = sandboxFileByArtifactId.get(input.id);
+            if (entry && !linkedSeen.has(entry.relativeWritePath)) {
+              linkedSeen.add(entry.relativeWritePath);
+              linkedFiles.push(entry);
             }
           }
         } else if (block.type === "tool_result" && options.includeToolCalls) {

@@ -48,11 +48,12 @@ export interface BuildMarkdownOptions {
   includeToolCalls?: boolean;
 }
 
-/** Linkable sandbox file. `path` is the wiggle absolute path; `filename` is the basename (used as the visible link label and the Obsidian wikilink target); `relativeWritePath` is where the file sits on disk relative to the per-chat attachments dir (e.g. `foo.md` for artifacts, `uploads/foo.png` for uploads) and is what the standard formatter uses to build the link URL. */
+/** Linkable sandbox file. `path` is the wiggle absolute path; `filename` is the basename (used as the visible link label and the Obsidian wikilink target); `relativeWritePath` is where the file sits on disk relative to the per-chat attachments dir (e.g. `foo.md` for artifacts, `uploads/foo.png` for uploads) and is what the standard formatter uses to build the link URL. `artifactId` is set for research artifacts replayed from `artifacts` tool_use blocks; matched against `tool_use.input.id` to emit a wikilink (since those blocks have no `path` to match by). */
 export interface SandboxFileLink {
   path: string;
   filename: string;
   relativeWritePath: string;
+  artifactId?: string;
 }
 
 export interface BuildMarkdownContext {
