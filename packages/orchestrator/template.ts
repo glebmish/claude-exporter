@@ -40,7 +40,8 @@ export function applyTemplate(templateText: string, result: ConversationResult):
   );
 
   if (!templateText.includes("{{content}}")) {
-    return substituted + content;
+    const sep = substituted.endsWith("\n") ? "" : "\n";
+    return substituted + sep + content;
   }
   return substituted;
 }

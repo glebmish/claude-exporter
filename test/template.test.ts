@@ -96,6 +96,19 @@ describe("applyTemplate", () => {
     const result = applyTemplate("{{humanMessages}}/{{assistantMessages}}\n{{content}}", baseResult);
     assert.ok(result.startsWith("{{humanMessages}}/{{assistantMessages}}\n"), "unknown vars left unchanged");
   });
+
+  it("inserts a newline between template body and content when {{content}} is absent and template lacks trailing newline", () => {
+    const template = "title: {{title}}";
+    const result = applyTemplate(template, baseResult);
+    assert.ok(result.startsWith("title: My Chat\n"), `expected newline after template body, got: ${JSON.stringify(result.slice(0, 40))}`);
+  });
+
+  it("does not insert an extra newline when template body already ends with one", () => {
+    const template = "title: {{title}}\n";
+    const result = applyTemplate(template, baseResult);
+    assert.ok(!result.startsWith("title: My Chat\n\n\n"), "no double-newline when template already terminates with one");
+    assert.ok(result.startsWith("title: My Chat\n"));
+  });
 });
 
 describe("applyTemplate with toc, tocWithRecap, keyTopics", () => {
