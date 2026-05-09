@@ -20,7 +20,13 @@ export interface ExistingFileInfo {
 
 /**
  * Read and parse an existing exported markdown file.
- * Returns an empty info object (with warnings) if the file is missing or unparseable.
+ *
+ * Renders that came from a template using only `{{keyTopicsFlat}}` (no `{{toc}}`
+ * or `{{tocWithRecap}}`) won't have a `## Table of Contents` section in the
+ * file — the agent ran during export, but only the topics field got
+ * substituted in. Try the template-aware key-topics parser AND the body
+ * `- **Messages**: N` line as fallbacks so we can still reuse enrichment for
+ * those files instead of regenerating on every refresh.
  */
 export async function loadExistingFile(
   fs: FileSystem,
@@ -35,14 +41,24 @@ export async function loadExistingFile(
   }
 
   const parsedToc = parseTocFromMarkdown(existing);
-  if (!parsedToc) {
-    warnings.push(`could not parse TOC from ${path} — proceeding with full export`);
-    return { warnings, existingKeyTopics: null, existingContent: existing };
-  }
-
   const existingKeyTopics =
     parseKeyTopicsFromMarkdown(existing) ??
     (templateText ? parseKeyTopicsFlatFromTemplate(existing, templateText) : null);
+  // Body line emitted by both default and templated renders: `- **Messages**: 53`.
+  const messagesMatch = existing.match(/^-\s+\*\*Messages\*\*:\s*(\d+)\b/m);
+  const messageCountFromBody = messagesMatch ? parseInt(messagesMatch[1], 10) : undefined;
+
+  if (!parsedToc) {
+    if (existingKeyTopics === null && messageCountFromBody === undefined) {
+      warnings.push(`could not parse TOC, key topics, or message count from ${path} — proceeding with full export`);
+    }
+    return {
+      existingKeyTopics,
+      ...(messageCountFromBody !== undefined ? { previousMessageCount: messageCountFromBody } : {}),
+      existingContent: existing,
+      warnings,
+    };
+  }
 
   return {
     existingToc: parsedToc.topics,
@@ -119,6 +135,27 @@ export async function decideEnrichment(
       const enriched = reuseExistingToc(parsed, existing.existingToc as TocTopic[], format, existing.existingKeyTopics);
       return { enriched, tocReused: true, tocRegenerated: false, warnings };
     }
+  }
+
+  // Topics-only fast path: when the user's template renders just `{{keyTopics}}`
+  // / `{{keyTopicsFlat}}` (no `{{toc}}` and no `{{tocWithRecap}}`), the file
+  // never carries a `## Table of Contents` section so `tocAvailable` is false
+  // — but the topics list is right there in the body and we don't need TOC
+  // structure to satisfy the template. Avoid the agent call.
+  const wantsToc = flags.toc || templateVars.hasToc;
+  const wantsTocRecap = flags.tocRecap || templateVars.hasTocWithRecap;
+  const onlyTopics = !wantsToc && !wantsTocRecap;
+  const topicsUpToDate =
+    existing.previousMessageCount !== undefined &&
+    existing.previousMessageCount >= parsed.messageCount;
+  if (onlyTopics && topicsUpToDate && existing.existingKeyTopics !== null) {
+    const topicsLine = existing.existingKeyTopics.join(", ");
+    const enriched: ConversationResult = {
+      ...parsed,
+      keyTopics: existing.existingKeyTopics.map((t) => `- ${t}`).join("\n"),
+      keyTopicsFlat: topicsLine,
+    };
+    return { enriched, tocReused: true, tocRegenerated: false, warnings };
   }
 
   // Regenerate

@@ -606,6 +606,51 @@ describe("runExport — flag-gated default rendering", () => {
   });
 });
 
+describe("runExport — topics-only reuse (no TOC section in existing file)", () => {
+  // Reproduces the regression where a chat exported with a template containing
+  // only `{{keyTopicsFlat}}` (no `{{toc}}` / `{{tocWithRecap}}`) was regenerating
+  // its enrichment on every refresh, because parseTocFromMarkdown returned null
+  // and loadExistingFile bailed out before trying the template-aware key-topics
+  // parser. Topics + message count should suffice to skip the agent call.
+  it("reuses key topics from a TOC-less existing file when only {{keyTopicsFlat}} is in the template", async () => {
+    const fs = new InMemoryFs();
+    const tpl = "# {{title}}\n\n- **Messages**: {{messages}}\n- **Topics**: {{keyTopicsFlat}}\n\n{{content}}\n";
+    // Hand-crafted existing file: no `## Table of Contents`, just the flat topics line and message count in the body.
+    const existingPath = "out/2026-01-15 Test Chat.md";
+    fs.preset(existingPath, [
+      "---",
+      "title: \"Test Chat\"",
+      "exported: \"2026-01-15\"",
+      "---",
+      "# Test Chat",
+      "",
+      "- **Messages**: 2",
+      "- **Topics**: greeting, small-talk",
+      "",
+      "(body…)",
+      "",
+    ].join("\n"));
+    const cdp = makeStubCdp({
+      conversation: baseConversation,
+      // If the agent is called, we'd need a mock claude command. Leaving claudePath unset
+      // means a regenerate attempt would fail noisily. The point of this test is that we
+      // SHOULDN'T regenerate.
+    });
+    const result = await runExport(
+      { ...baseOpts, templateText: tpl, topics: true, existingFilePath: existingPath },
+      { fs, cdpOverride: cdp },
+    );
+    const note = fs.read(result.filePath) as string;
+    // Topics line preserved.
+    assert.ok(note.includes("greeting, small-talk"), `topics must be reused, got note:\n${note.slice(0, 300)}`);
+    // No "enrichment failed" warning — i.e. the agent wasn't called.
+    assert.ok(
+      !result.warnings.some((w) => /enrichment failed/i.test(w)),
+      `topics-only reuse must skip the agent call, got warnings: ${result.warnings.join(" | ")}`,
+    );
+  });
+});
+
 describe("runExport — discoverExistingByDatedTitle", () => {
   it("finds existing file when discover flag is true", async () => {
     const fs = new InMemoryFs();
