@@ -42,7 +42,15 @@ async function fetchConversation(): Promise<ConversationData> {
 // --- Image fetching ---
 
 async function fetchImage(url: string): Promise<string | null> {
-  const response = await fetch(url, { credentials: "include" });
+  // Tolerate transport-level failures (offline, DNS, abort) the same way as a
+  // non-OK HTTP response: skip this image rather than aborting the whole export.
+  let response: Response;
+  try {
+    response = await fetch(url, { credentials: "include" });
+  } catch (e) {
+    console.warn(`[claude-export] failed to fetch ${url}:`, e);
+    return null;
+  }
   if (!response.ok) return null;
   const blob = await response.blob();
   return new Promise((resolve) => {
