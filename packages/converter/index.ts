@@ -58,10 +58,25 @@ export function sanitizeFilename(title: string): string {
     .substring(0, 50);
 }
 
-export function sanitizeConversationTitle(name: string | null): string {
-  if (!name || name === "New conversation") return "claude_conversation";
+/**
+ * Workaround for the unofficial "Chat Archive" browser extension/plugin: when it
+ * archives a chat it captures the sidebar row's textContent (which includes the
+ * "Last message X ago" time-ago label) into the conversation `name` and appends
+ * ` ^archived`. Result: `<title>Last message N <unit> ago ^archived`. This is
+ * NOT a Claude.ai bug — it is data damage caused by the third-party plugin and
+ * it is permanent in stored chat names. We strip both markers so exported notes
+ * have clean titles.
+ */
+export function stripArchivePluginMarkers(name: string): string {
   return name
     .replace(/\s*\^archived$/i, "")
+    .replace(/Last message .*$/i, "")
+    .trimEnd();
+}
+
+export function sanitizeConversationTitle(name: string | null): string {
+  if (!name || name === "New conversation") return "claude_conversation";
+  return stripArchivePluginMarkers(name)
     .replace(/[<>:"/\\|?*]/g, "_")
     .replace(/\s+/g, "_")
     .replace(/_{2,}/g, "_")
@@ -337,7 +352,7 @@ export function parseConversation(
   const isObsidian = options.format === "obsidian";
 
   const rawMessages = data.chat_messages || [];
-  const title = (data.name || "Claude Conversation").replace(/\s*\^archived$/i, "");
+  const title = stripArchivePluginMarkers(data.name || "Claude Conversation") || "Claude Conversation";
   const model = data.model || "unknown";
   const chatTitleMinimal = sanitizeForFilename(title);
   const chatTitleSanitized = sanitizeConversationTitle(data.name);

@@ -4,6 +4,7 @@ import {
   renderDefault,
   buildEnrichmentInput,
   sanitizeConversationTitle,
+  stripArchivePluginMarkers,
 } from "../converter/index.ts";
 import type { ConversationData, ConversationResult } from "../converter/index.ts";
 import { sanitizeForFilename } from "../converter/filename-template.ts";
@@ -111,7 +112,7 @@ async function withCdp<T>(
 }
 
 function computeNamingContext(opts: ExportOptions, data: ConversationData): import("./sandbox.ts").SandboxFileNamingContext {
-  const title = (data.name || "Claude Conversation").replace(/\s*\^archived$/i, "");
+  const title = stripArchivePluginMarkers(data.name || "Claude Conversation") || "Claude Conversation";
   return {
     artifactNameTemplate: opts.artifactNameTemplate,
     chatTitle: sanitizeForFilename(title),
@@ -281,7 +282,7 @@ export async function runExport(opts: ExportOptions, deps: ExportDeps): Promise<
   return {
     filePath: notePath,
     attachmentsDir: attachmentsDirAbs,
-    title: (data.name || "Claude Conversation").replace(/\s*\^archived$/i, ""),
+    title: stripArchivePluginMarkers(data.name || "Claude Conversation") || "Claude Conversation",
     datedTitle: parsed.datedTitle,
     messageCount: parsed.messageCount,
     artifactCount: sandboxFiles.length,
