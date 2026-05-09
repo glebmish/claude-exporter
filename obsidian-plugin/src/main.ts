@@ -57,7 +57,7 @@ export default class ClaudeExporterPlugin extends Plugin {
     this.addSettingTab(new ClaudeExporterSettingsTab(this.app, this));
 
     // Export button in frontmatter properties
-    const onLeafChange = setupExportButton(this.app, () => this.settings);
+    const onLeafChange = setupExportButton(this, () => this.settings);
     this.registerEvent(
       this.app.workspace.on("active-leaf-change", onLeafChange)
     );

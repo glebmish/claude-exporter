@@ -135,11 +135,13 @@ export class RefreshAllModal extends Modal {
     const buttonContainer = contentEl.createDiv({ cls: "claude-refresh-buttons" });
     buttonContainer.style.cssText = "display:flex;gap:8px;justify-content:flex-end;margin-top:8px";
 
+    // Cancel button — phase-dependent behavior dispatched via a closure variable
+    // so we never have to remove or layer event handlers. Pre-run: close the
+    // modal. Mid-run: abort but leave the modal open so per-item status stays
+    // visible. Post-run: close the modal.
     const cancelBtn = buttonContainer.createEl("button", { text: "Cancel" });
-    cancelBtn.addEventListener("click", () => {
-      this.abortController?.abort();
-      this.close();
-    });
+    let onCancel: () => void = () => this.close();
+    cancelBtn.addEventListener("click", () => onCancel());
 
     const refreshBtn = buttonContainer.createEl("button", {
       text: `Refresh ${this.entries.length}`,
@@ -147,14 +149,15 @@ export class RefreshAllModal extends Modal {
     }) as HTMLButtonElement;
 
     refreshBtn.addEventListener("click", () => {
-      this.runRefresh(selectAllRow, cancelBtn, refreshBtn);
+      this.runRefresh(selectAllRow, cancelBtn, refreshBtn, (h) => { onCancel = h; });
     });
   }
 
   private async runRefresh(
     selectAllRow: HTMLElement,
     cancelBtn: HTMLButtonElement,
-    refreshBtn: HTMLButtonElement
+    refreshBtn: HTMLButtonElement,
+    setCancelHandler: (h: () => void) => void,
   ) {
     // Lock selection UI
     selectAllRow.style.display = "none";
@@ -167,9 +170,8 @@ export class RefreshAllModal extends Modal {
     this.abortController = new AbortController();
     const signal = this.abortController.signal;
 
-    cancelBtn.onclick = () => {
-      this.abortController?.abort();
-    };
+    // Mid-run: abort only — the modal stays open so per-item status remains visible.
+    setCancelHandler(() => this.abortController?.abort());
 
     const selected = this.entries.filter((e) => e.selected);
     let doneCount = 0;
@@ -209,7 +211,7 @@ export class RefreshAllModal extends Modal {
     }
 
     cancelBtn.textContent = "Close";
-    cancelBtn.onclick = () => this.close();
+    setCancelHandler(() => this.close());
 
     const summary = errorCount > 0
       ? `Refreshed ${doneCount}, ${errorCount} failed`

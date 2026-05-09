@@ -4,7 +4,7 @@ import type { ExportOptions } from "../../packages/orchestrator/index.ts";
 import { VaultFs } from "./fs-vault.ts";
 import {
   findChrome, isAlreadyRunning, launchChrome, waitForReady,
-  CdpClient, extractAuth, log,
+  CdpClient, extractAuth, log, shutdownChrome,
 } from "../../packages/chrome/index.ts";
 import { parseConversationId } from "../../packages/converter/index.ts";
 
@@ -98,33 +98,41 @@ export async function browseAndPick(
     child = launchChrome(chromePath, "https://claude.ai");
   }
 
-  if (signal?.aborted) throw new Error("Cancelled");
-  await waitForReady({ signal });
-
-  const cdp = await CdpClient.connect();
+  // Once Chrome has been spawned the caller takes ownership only on a successful
+  // return. If anything below throws (cancel, auth failure, CDP error), the child
+  // would otherwise leak — kill it here before propagating the error.
   try {
-    // Wait for auth first
-    let hasAuth = false;
-    while (!hasAuth) {
-      if (signal?.aborted) throw new Error("Cancelled");
-      const cookies = await cdp.getCookies("claude.ai");
-      hasAuth = !!extractAuth(cookies);
-      if (!hasAuth) {
-        onStatus("Log in to Claude in the browser...");
-        await new Promise((r) => setTimeout(r, 1000));
-      }
-    }
+    if (signal?.aborted) throw new Error("Cancelled");
+    await waitForReady({ signal });
 
-    // Poll URL until user opens a chat
-    onStatus("Choose a chat in Chrome...");
-    while (true) {
-      if (signal?.aborted) throw new Error("Cancelled");
-      const url = (await cdp.evaluate("window.location.href")) as string;
-      const id = parseConversationId(url || "");
-      if (id) return { conversationId: id, child };
-      await new Promise((r) => setTimeout(r, 500));
+    const cdp = await CdpClient.connect();
+    try {
+      // Wait for auth first
+      let hasAuth = false;
+      while (!hasAuth) {
+        if (signal?.aborted) throw new Error("Cancelled");
+        const cookies = await cdp.getCookies("claude.ai");
+        hasAuth = !!extractAuth(cookies);
+        if (!hasAuth) {
+          onStatus("Log in to Claude in the browser...");
+          await new Promise((r) => setTimeout(r, 1000));
+        }
+      }
+
+      // Poll URL until user opens a chat
+      onStatus("Choose a chat in Chrome...");
+      while (true) {
+        if (signal?.aborted) throw new Error("Cancelled");
+        const url = (await cdp.evaluate("window.location.href")) as string;
+        const id = parseConversationId(url || "");
+        if (id) return { conversationId: id, child };
+        await new Promise((r) => setTimeout(r, 500));
+      }
+    } finally {
+      cdp.close();
     }
-  } finally {
-    cdp.close();
+  } catch (err) {
+    if (child) shutdownChrome(child);
+    throw err;
   }
 }
