@@ -69,9 +69,13 @@ function chromeDownload(url: string, filename: string): Promise<number> {
   });
 }
 
-interface ArtifactFile {
+interface SandboxFile {
   filename: string;
-  content: string;
+  /** Path relative to the chat folder inside the zip (e.g. `02-shape.md` or `uploads/IMG.png`) */
+  relativeWritePath: string;
+  contentType: string;
+  /** data URL — same shape for text and binary, popup decodes the base64 payload */
+  dataUrl: string;
 }
 
 interface ImageFile {
@@ -81,7 +85,7 @@ interface ImageFile {
 
 async function saveExport(
   markdown: string,
-  artifactFiles: ArtifactFile[],
+  sandboxFiles: SandboxFile[],
   imageFiles: ImageFile[],
   datedTitle: string
 ): Promise<{ filename: string; extraCount: number }> {
@@ -92,20 +96,19 @@ async function saveExport(
   const folder = zip.folder(datedTitle);
   folder.file(`${datedTitle}.md`, markdown);
 
-  if (artifactFiles && artifactFiles.length > 0) {
-    const artFolder = folder.folder("artifacts");
-    for (const art of artifactFiles) {
-      artFolder.file(art.filename, art.content);
+  // Sandbox files: write at relativeWritePath (uploads land under uploads/, artifacts flat).
+  if (sandboxFiles && sandboxFiles.length > 0) {
+    for (const f of sandboxFiles) {
+      const base64 = f.dataUrl.split(",")[1];
+      if (!base64) continue;
+      folder.file(f.relativeWritePath, base64, { base64: true });
     }
   }
 
   if (imageFiles && imageFiles.length > 0) {
-    const imgFolder = folder.folder("images");
     for (const img of imageFiles) {
       const base64 = img.dataUrl.split(",")[1];
-      if (base64) {
-        imgFolder.file(img.filename, base64, { base64: true });
-      }
+      if (base64) folder.file(img.filename, base64, { base64: true });
     }
   }
 
@@ -116,7 +119,7 @@ async function saveExport(
   } finally {
     URL.revokeObjectURL(blobUrl);
   }
-  const totalFiles = (artifactFiles?.length || 0) + (imageFiles?.length || 0);
+  const totalFiles = (sandboxFiles?.length || 0) + (imageFiles?.length || 0);
   return { filename: `${datedTitle}.zip`, extraCount: totalFiles };
 }
 
@@ -155,7 +158,7 @@ exportBtn.addEventListener("click", async () => {
 
     const result = await saveExport(
       response.markdown,
-      response.artifactFiles,
+      response.sandboxFiles,
       response.imageFiles,
       response.datedTitle
     );

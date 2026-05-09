@@ -88,6 +88,100 @@ async function fetchAllImages(
   return imageFiles;
 }
 
+// --- Sandbox files (wiggle) ---
+
+interface SandboxFileMetadata {
+  path: string;
+  size: number;
+  content_type: string;
+  created_at: string;
+  custom_metadata?: Record<string, unknown>;
+}
+
+interface SandboxFileEntry {
+  path: string;
+  filename: string;
+  /** Path relative to the per-chat attachments dir (e.g. `02-shape.md` or `uploads/IMG.png`) */
+  relativeWritePath: string;
+  contentType: string;
+  /** data URL `data:<mime>;base64,...` — popup decodes for the zip */
+  dataUrl: string;
+}
+
+function basename(path: string): string {
+  const idx = path.lastIndexOf("/");
+  return idx === -1 ? path : path.slice(idx + 1);
+}
+
+function isUpload(path: string): boolean {
+  return path.startsWith("/mnt/user-data/uploads/");
+}
+
+async function downloadSandboxFile(
+  orgId: string,
+  conversationId: string,
+  path: string,
+): Promise<{ contentType: string; dataUrl: string } | null> {
+  let response: Response;
+  try {
+    response = await fetch(
+      `/api/organizations/${orgId}/conversations/${conversationId}/wiggle/download-file?path=${encodeURIComponent(path)}`,
+      { credentials: "include" },
+    );
+  } catch (e) {
+    console.warn(`[claude-export] failed to fetch sandbox file ${path}:`, e);
+    return null;
+  }
+  if (!response.ok) return null;
+  const contentType = response.headers.get("content-type") || "application/octet-stream";
+  const blob = await response.blob();
+  const dataUrl: string = await new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result as string);
+    reader.readAsDataURL(blob);
+  });
+  return { contentType, dataUrl };
+}
+
+async function fetchAllSandboxFiles(
+  orgId: string,
+  conversationId: string,
+): Promise<SandboxFileEntry[]> {
+  let listResp: Response;
+  try {
+    listResp = await fetch(
+      `/api/organizations/${orgId}/conversations/${conversationId}/wiggle/list-files?prefix=`,
+      { credentials: "include" },
+    );
+  } catch (e) {
+    console.warn("[claude-export] sandbox list-files failed:", e);
+    return [];
+  }
+  if (!listResp.ok) return [];
+
+  const list = (await listResp.json()) as { files_metadata?: SandboxFileMetadata[] };
+  const metadata = (list.files_metadata ?? []).slice().sort((a, b) => {
+    if (a.created_at !== b.created_at) return a.created_at < b.created_at ? -1 : 1;
+    return a.path < b.path ? -1 : 1;
+  });
+
+  const out: SandboxFileEntry[] = [];
+  for (const meta of metadata) {
+    const payload = await downloadSandboxFile(orgId, conversationId, meta.path);
+    if (!payload) continue;
+    const name = basename(meta.path);
+    const relativeWritePath = isUpload(meta.path) ? `uploads/${name}` : name;
+    out.push({
+      path: meta.path,
+      filename: name,
+      relativeWritePath,
+      contentType: payload.contentType,
+      dataUrl: payload.dataUrl,
+    });
+  }
+  return out;
+}
+
 // --- Message listener ---
 
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
@@ -96,26 +190,37 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   (async () => {
     const data = await fetchConversation();
     const messages = data.chat_messages || [];
+    const orgId = getOrgId();
+    const conversationId = getConversationId();
 
-    // Fetch images
-    const imageFiles = messages.length > 0 ? await fetchAllImages(messages) : [];
+    // Fetch images and sandbox files in parallel
+    const [imageFiles, sandboxFiles] = await Promise.all([
+      messages.length > 0 ? fetchAllImages(messages) : Promise.resolve([] as ImageFile[]),
+      orgId && conversationId ? fetchAllSandboxFiles(orgId, conversationId) : Promise.resolve([] as SandboxFileEntry[]),
+    ]);
 
     const result = buildMarkdown(
       data,
       { format: "standard", ...msg.options },
       {
-        conversationId: getConversationId(),
+        conversationId,
         imageFilenames: imageFiles.map((f) => ({
           msgIndex: f.msgIndex,
           filename: f.filename,
         })),
+        sandboxFiles: sandboxFiles.map((f) => ({ path: f.path, filename: f.filename, relativeWritePath: f.relativeWritePath })),
       }
     );
 
     return {
       success: true,
       markdown: result.markdown,
-      artifactFiles: result.artifactFiles,
+      sandboxFiles: sandboxFiles.map((f) => ({
+        filename: f.filename,
+        relativeWritePath: f.relativeWritePath,
+        contentType: f.contentType,
+        dataUrl: f.dataUrl,
+      })),
       imageFiles: imageFiles.map((f) => ({
         filename: f.filename,
         dataUrl: f.dataUrl,
