@@ -69,6 +69,12 @@ export interface ExportDeps {
   signal?: AbortSignal;
   /** Test seam — bypass Chrome lifecycle. */
   cdpOverride?: CdpFacade;
+  /**
+   * Fired after the conversation + images + sandbox files have been fetched
+   * and Chrome is no longer needed. The caller can use this to release any
+   * Chrome resources it owns before the (potentially slow) enrichment step.
+   */
+  onFetchComplete?: () => void;
 }
 
 export interface ExportResult {

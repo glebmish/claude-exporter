@@ -1,26 +1,16 @@
 import { App, Modal, Setting, Notice } from "obsidian";
 import { parseConversationId } from "../../../packages/converter/index.ts";
-import { runExport, browseAndPick } from "../export";
-import { shutdownChrome } from "../../../packages/chrome/index.ts";
+import { runExport, browseAndPick, type ExportSettings } from "../export";
+import { CdpClient, shutdownChrome } from "../../../packages/chrome/index.ts";
 import { RefreshAllModal } from "./refresh-all-modal";
 
-interface ExportModalSettings {
-  exportFolder: string;
-  artifactsFolder: string;
-  chromePath: string;
-  templatePath: string;
-  includeThinking: boolean;
-  includeToolCalls: boolean;
-  enableToc: boolean;
-  claudePath: string;
-}
-
 export class ExportModal extends Modal {
-  private settings: ExportModalSettings;
+  private settings: ExportSettings;
   private abortController: AbortController | null = null;
   private browseChild: import("child_process").ChildProcess | null = null;
+  private browseCdp: CdpClient | null = null;
 
-  constructor(app: App, settings: ExportModalSettings) {
+  constructor(app: App, settings: ExportSettings) {
     super(app);
     this.settings = settings;
   }
@@ -78,21 +68,32 @@ export class ExportModal extends Modal {
       this.abortController = new AbortController();
 
       try {
-        const { conversationId, child } = await browseAndPick(
+        const { conversationId, cdp, child } = await browseAndPick(
           this.settings,
           (msg) => { statusEl.textContent = msg; },
           this.abortController.signal
         );
         this.browseChild = child;
+        this.browseCdp = cdp;
 
-        // Chat selected — export it
+        // Chat selected — export it, reusing the CDP we already have open.
+        // The orchestrator releases Chrome via onFetchComplete after fetching,
+        // so onReleased nulls our refs to keep onClose's cleanup a no-op.
         statusEl.textContent = "Exporting...";
         const result = await runExport(
           this.app,
           this.settings,
           conversationId,
           (msg) => { statusEl.textContent = msg; },
-          this.abortController.signal
+          this.abortController.signal,
+          {
+            cdp,
+            child,
+            onReleased: () => {
+              this.browseCdp = null;
+              this.browseChild = null;
+            },
+          },
         );
 
         this.close();
@@ -171,6 +172,8 @@ export class ExportModal extends Modal {
 
   onClose() {
     this.abortController?.abort();
+    this.browseCdp?.close();
+    this.browseCdp = null;
     shutdownChrome(this.browseChild);
     this.browseChild = null;
     this.contentEl.empty();

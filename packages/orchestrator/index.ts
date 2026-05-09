@@ -163,6 +163,10 @@ export async function runExport(opts: ExportOptions, deps: ExportDeps): Promise<
   const { data, imageFiles, sandboxFiles, sandboxWarnings } = await fetchData(opts, deps);
   if (deps.signal?.aborted) throw new Error("Cancelled");
 
+  // Chrome is no longer needed past this point — let the caller release it
+  // before the (potentially slow) enrichment call.
+  deps.onFetchComplete?.();
+
   // Phase 2: parse
   deps.onStatus?.("Converting...");
   const attachmentsBaseDir = opts.attachmentsDir ?? opts.outputDir;
@@ -220,6 +224,7 @@ export async function runExport(opts: ExportOptions, deps: ExportDeps): Promise<
     flags,
     tplVars,
     existing,
+    deps.onStatus,
   );
   warnings.push(...decision.warnings);
   const enriched = decision.enriched;

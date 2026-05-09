@@ -8,7 +8,7 @@ import {
 } from "../../packages/chrome/index.ts";
 import { parseConversationId } from "../../packages/converter/index.ts";
 
-interface ExportSettings {
+export interface ExportSettings {
   exportFolder: string;
   artifactsFolder: string;
   chromePath: string;
@@ -31,12 +31,20 @@ export interface ExportResult {
   previousMessageCount?: number;
 }
 
+export interface ChromeSession {
+  cdp: CdpClient;
+  child: import("child_process").ChildProcess | null;
+  /** Called after runExport releases Chrome — caller should drop its references. */
+  onReleased?: () => void;
+}
+
 export async function runExport(
   app: App,
   settings: ExportSettings,
   conversationId: string,
   onStatus: StatusCallback,
   signal?: AbortSignal,
+  chrome?: ChromeSession,
 ): Promise<ExportResult> {
   log("Starting export for:", conversationId);
   const fs = new VaultFs(app);
@@ -74,7 +82,19 @@ export async function runExport(
     chromePath: settings.chromePath,
   };
 
-  const result = await runOrchestratorExport(opts, { fs, onStatus, signal });
+  const result = await runOrchestratorExport(opts, {
+    fs,
+    onStatus,
+    signal,
+    ...(chrome ? {
+      cdpOverride: chrome.cdp,
+      onFetchComplete: () => {
+        chrome.cdp.close();
+        if (chrome.child) shutdownChrome(chrome.child);
+        chrome.onReleased?.();
+      },
+    } : {}),
+  });
   return {
     filePath: result.filePath,
     title: result.title,
@@ -88,7 +108,11 @@ export async function browseAndPick(
   settings: ExportSettings,
   onStatus: StatusCallback,
   signal?: AbortSignal,
-): Promise<{ conversationId: string; child: import("child_process").ChildProcess | null }> {
+): Promise<{
+  conversationId: string;
+  cdp: CdpClient;
+  child: import("child_process").ChildProcess | null;
+}> {
   onStatus("Opening Claude...");
   let child: import("child_process").ChildProcess | null = null;
   const alreadyRunning = await isAlreadyRunning();
@@ -98,40 +122,34 @@ export async function browseAndPick(
     child = launchChrome(chromePath, "https://claude.ai");
   }
 
-  // Once Chrome has been spawned the caller takes ownership only on a successful
-  // return. If anything below throws (cancel, auth failure, CDP error), the child
-  // would otherwise leak — kill it here before propagating the error.
+  let cdp: CdpClient | null = null;
   try {
     if (signal?.aborted) throw new Error("Cancelled");
     await waitForReady({ signal });
 
-    const cdp = await CdpClient.connect();
-    try {
-      // Wait for auth first
-      let hasAuth = false;
-      while (!hasAuth) {
-        if (signal?.aborted) throw new Error("Cancelled");
-        const cookies = await cdp.getCookies("claude.ai");
-        hasAuth = !!extractAuth(cookies);
-        if (!hasAuth) {
-          onStatus("Log in to Claude in the browser...");
-          await new Promise((r) => setTimeout(r, 1000));
-        }
-      }
+    cdp = await CdpClient.connect();
 
-      // Poll URL until user opens a chat
-      onStatus("Choose a chat in Chrome...");
-      while (true) {
-        if (signal?.aborted) throw new Error("Cancelled");
-        const url = (await cdp.evaluate("window.location.href")) as string;
-        const id = parseConversationId(url || "");
-        if (id) return { conversationId: id, child };
-        await new Promise((r) => setTimeout(r, 500));
+    let hasAuth = false;
+    while (!hasAuth) {
+      if (signal?.aborted) throw new Error("Cancelled");
+      const cookies = await cdp.getCookies("claude.ai");
+      hasAuth = !!extractAuth(cookies);
+      if (!hasAuth) {
+        onStatus("Log in to Claude in the browser...");
+        await new Promise((r) => setTimeout(r, 1000));
       }
-    } finally {
-      cdp.close();
+    }
+
+    onStatus("Choose a chat in Chrome...");
+    while (true) {
+      if (signal?.aborted) throw new Error("Cancelled");
+      const url = (await cdp.evaluate("window.location.href")) as string;
+      const id = parseConversationId(url || "");
+      if (id) return { conversationId: id, cdp, child };
+      await new Promise((r) => setTimeout(r, 500));
     }
   } catch (err) {
+    if (cdp) cdp.close();
     if (child) shutdownChrome(child);
     throw err;
   }

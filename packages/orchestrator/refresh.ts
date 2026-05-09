@@ -98,6 +98,7 @@ export async function decideEnrichment(
   flags: EnrichmentFlags,
   templateVars: TemplateVarPresence,
   existing: ExistingFileInfo,
+  onStatus?: (msg: string) => void,
 ): Promise<EnrichmentDecision> {
   const wantsAny = flags.toc || flags.tocRecap || flags.topics;
   if (!wantsAny) {
@@ -122,6 +123,7 @@ export async function decideEnrichment(
 
   // Regenerate
   try {
+    onStatus?.("Generating table of contents...");
     const enriched = await enrichWithToc(parsed, enrichmentInput, format, claudePath, existing.existingToc);
     return { enriched, tocReused: false, tocRegenerated: true, warnings };
   } catch (e: unknown) {
