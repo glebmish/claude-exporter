@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
-  "name": "Claude Chat Exporter",
-  "version": "1.0.0",
+  "name": "Claude Exporter",
+  "version": "0.1.0",
   "description": "Export Claude.ai conversations to markdown with optional artifact extraction.",
   "author": "Gleb Mishchenko",
   "homepage_url": "https://github.com/glebmish/claude-ai-exporter",

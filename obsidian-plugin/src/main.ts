@@ -40,7 +40,7 @@ export default class ClaudeExporterPlugin extends Plugin {
 
     // Ribbon icon
     addIcon("claude-export", CLAUDE_EXPORT_ICON);
-    this.addRibbonIcon("claude-export", "Export Claude Chat", () => {
+    this.addRibbonIcon("claude-export", "Export Claude chat", () => {
       new ExportModal(this.app, this.settings).open();
     });
 
