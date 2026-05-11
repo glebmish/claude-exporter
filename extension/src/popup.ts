@@ -25,6 +25,25 @@ async function getActiveClaudeTab(): Promise<chrome.tabs.Tab | null> {
   return tabOrigin === "https://claude.ai" ? tab : null;
 }
 
+// Tabs opened before the extension was (re)loaded never receive the declared
+// content script, so sendMessage rejects with "Receiving end does not exist".
+// Inject on demand and retry instead of asking the user to refresh.
+async function sendToContentScript(tabId: number, message: unknown): Promise<any> {
+  try {
+    return await chrome.tabs.sendMessage(tabId, message);
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (!/Receiving end does not exist|Could not establish connection/i.test(msg)) {
+      throw err;
+    }
+    await chrome.scripting.executeScript({
+      target: { tabId },
+      files: ["dist/content.js"],
+    });
+    return await chrome.tabs.sendMessage(tabId, message);
+  }
+}
+
 // Settings link
 document.getElementById("settingsLink")!.addEventListener("click", () => {
   chrome.runtime.openOptionsPage();
@@ -155,7 +174,7 @@ exportBtn.addEventListener("click", async () => {
       return;
     }
 
-    const response = await chrome.tabs.sendMessage(tab.id!, {
+    const response = await sendToContentScript(tab.id!, {
       action: "export",
       options,
     });
@@ -195,7 +214,7 @@ copyBtn.addEventListener("click", async () => {
       return;
     }
 
-    const response = await chrome.tabs.sendMessage(tab.id!, { action: "copyChat" });
+    const response = await sendToContentScript(tab.id!, { action: "copyChat" });
 
     if (!response?.success) {
       setStatus(response?.error || "Copy failed", "status-error");
