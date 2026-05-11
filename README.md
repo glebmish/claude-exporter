@@ -1,14 +1,29 @@
 # Claude AI Exporter
 
-Export Claude.ai conversations to Markdown — as a CLI, a Chrome extension, or an Obsidian plugin. Produces readable notes with artifacts, tool use, citations, and an optional AI-generated table of contents.
+Export Claude.ai conversations to Markdown straight into your Obsidian vault — or, if you prefer, via a CLI or a Chrome extension. Produces readable notes with artifacts, tool use, citations, and an optional AI-generated table of contents.
+
+<!--
+  📺 Demo
+
+  TODO: drop a GIF or short MP4 of the Obsidian plugin in action here.
+  Suggested flow: open a Claude chat → run "Export current Claude chat" command →
+  show the rendered note in the vault with TOC, callouts, and artifacts.
+
+  Replace this comment with:
+    ![demo](./docs/demo.gif)
+  or:
+    <video src="./docs/demo.mp4" controls></video>
+-->
+
+> **Demo:** _coming soon — GIF/video walkthrough of the Obsidian plugin._
 
 ## Three ways to use it
 
 | | What it is | For |
 |---|---|---|
+| **Obsidian plugin** (`obsidian-plugin/`) | Exports directly into a vault, with per-note refresh and a Refresh-All modal | Keeping a searchable archive inside Obsidian |
 | **CLI** (`cli/`) | `claude-export <url>` in the terminal | Scripts, batch exports, one-off dumps |
 | **Chrome extension** (`extension/`) | Popup on claude.ai, downloads Markdown + artifacts | Quick manual exports while browsing |
-| **Obsidian plugin** (`obsidian-plugin/`) | Exports directly into a vault, with per-note refresh and a Refresh-All modal | Keeping a searchable archive inside Obsidian |
 
 All three share the same converter, so output is consistent across them.
 
@@ -43,6 +58,17 @@ npm run build:plugin      # → obsidian-plugin/dist/ (main.js + manifest.json)
 ```
 
 There's also `npm run dev:plugin` for watch-mode builds while iterating on the plugin, and `npm test` to run the test suite.
+
+### Obsidian plugin
+
+After `build:plugin`, copy the plugin files into your vault (**copy, not symlink** — symlinks break Obsidian Sync):
+
+```bash
+mkdir -p <vault>/.obsidian/plugins/claude-exporter
+cp obsidian-plugin/dist/* <vault>/.obsidian/plugins/claude-exporter/
+```
+
+Then in **Settings → Community plugins**, enable **Claude Exporter**.
 
 ### CLI
 
@@ -95,17 +121,6 @@ After `build:extension`:
 2. Enable **Developer mode**
 3. Click **Load unpacked** and select the `extension/` directory
 4. Click the extension icon on any `claude.ai/chat/...` page
-
-### Obsidian plugin
-
-After `build:plugin`, copy the plugin files into your vault (**copy, not symlink** — symlinks break Obsidian Sync):
-
-```bash
-mkdir -p <vault>/.obsidian/plugins/claude-exporter
-cp obsidian-plugin/dist/* <vault>/.obsidian/plugins/claude-exporter/
-```
-
-Then in **Settings → Community plugins**, enable **Claude Exporter**.
 
 ## Template system
 
