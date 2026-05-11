@@ -3,6 +3,8 @@
 import {
   buildMarkdown,
   collectImages,
+  parseConversation,
+  renderContent,
   sanitizeFilename,
 } from "../../packages/converter/index.ts";
 import type { ConversationData, Message } from "../../packages/converter/types.ts";
@@ -184,50 +186,80 @@ async function fetchAllSandboxFiles(
 
 // --- Message listener ---
 
+async function handleExport(options: Record<string, unknown>) {
+  const data = await fetchConversation();
+  const messages = data.chat_messages || [];
+  const orgId = getOrgId();
+  const conversationId = getConversationId();
+
+  // Fetch images and sandbox files in parallel
+  const [imageFiles, sandboxFiles] = await Promise.all([
+    messages.length > 0 ? fetchAllImages(messages) : Promise.resolve([] as ImageFile[]),
+    orgId && conversationId ? fetchAllSandboxFiles(orgId, conversationId) : Promise.resolve([] as SandboxFileEntry[]),
+  ]);
+
+  const result = buildMarkdown(
+    data,
+    { format: "standard", ...options },
+    {
+      conversationId,
+      imageFilenames: imageFiles.map((f) => ({
+        msgIndex: f.msgIndex,
+        filename: f.filename,
+      })),
+      sandboxFiles: sandboxFiles.map((f) => ({ path: f.path, filename: f.filename, relativeWritePath: f.relativeWritePath })),
+    }
+  );
+
+  return {
+    success: true,
+    markdown: result.markdown,
+    sandboxFiles: sandboxFiles.map((f) => ({
+      filename: f.filename,
+      relativeWritePath: f.relativeWritePath,
+      contentType: f.contentType,
+      dataUrl: f.dataUrl,
+    })),
+    imageFiles: imageFiles.map((f) => ({
+      filename: f.filename,
+      dataUrl: f.dataUrl,
+    })),
+    datedTitle: result.datedTitle,
+  };
+}
+
+async function handleCopyChat() {
+  const data = await fetchConversation();
+  const conversationId = getConversationId();
+
+  const result = parseConversation(
+    data,
+    {
+      format: "standard",
+      includeArtifacts: false,
+      includeThinking: false,
+      includeToolCalls: false,
+    },
+    { conversationId }
+  );
+
+  return {
+    success: true,
+    markdown: renderContent(result.messages, result.linksSection),
+  };
+}
+
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
-  if (msg.action !== "export") return;
+  const handler =
+    msg.action === "export"
+      ? () => handleExport(msg.options ?? {})
+      : msg.action === "copyChat"
+        ? () => handleCopyChat()
+        : null;
 
-  (async () => {
-    const data = await fetchConversation();
-    const messages = data.chat_messages || [];
-    const orgId = getOrgId();
-    const conversationId = getConversationId();
+  if (!handler) return;
 
-    // Fetch images and sandbox files in parallel
-    const [imageFiles, sandboxFiles] = await Promise.all([
-      messages.length > 0 ? fetchAllImages(messages) : Promise.resolve([] as ImageFile[]),
-      orgId && conversationId ? fetchAllSandboxFiles(orgId, conversationId) : Promise.resolve([] as SandboxFileEntry[]),
-    ]);
-
-    const result = buildMarkdown(
-      data,
-      { format: "standard", ...msg.options },
-      {
-        conversationId,
-        imageFilenames: imageFiles.map((f) => ({
-          msgIndex: f.msgIndex,
-          filename: f.filename,
-        })),
-        sandboxFiles: sandboxFiles.map((f) => ({ path: f.path, filename: f.filename, relativeWritePath: f.relativeWritePath })),
-      }
-    );
-
-    return {
-      success: true,
-      markdown: result.markdown,
-      sandboxFiles: sandboxFiles.map((f) => ({
-        filename: f.filename,
-        relativeWritePath: f.relativeWritePath,
-        contentType: f.contentType,
-        dataUrl: f.dataUrl,
-      })),
-      imageFiles: imageFiles.map((f) => ({
-        filename: f.filename,
-        dataUrl: f.dataUrl,
-      })),
-      datedTitle: result.datedTitle,
-    };
-  })()
+  handler()
     .then((result) => sendResponse(result))
     .catch((err) => sendResponse({ success: false, error: err.message }));
 

@@ -10,7 +10,20 @@ const checkboxes: Record<string, HTMLInputElement> = {
 };
 
 const exportBtn = document.getElementById("exportBtn") as HTMLButtonElement;
+const copyBtn = document.getElementById("copyBtn") as HTMLButtonElement;
 const statusEl = document.getElementById("status") as HTMLElement;
+
+function setButtonsDisabled(disabled: boolean): void {
+  exportBtn.disabled = disabled;
+  copyBtn.disabled = disabled;
+}
+
+async function getActiveClaudeTab(): Promise<chrome.tabs.Tab | null> {
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  let tabOrigin = "";
+  try { tabOrigin = new URL(tab?.url ?? "").origin; } catch { /* invalid URL */ }
+  return tabOrigin === "https://claude.ai" ? tab : null;
+}
 
 // Settings link
 document.getElementById("settingsLink")!.addEventListener("click", () => {
@@ -131,17 +144,14 @@ exportBtn.addEventListener("click", async () => {
     options[key] = el.checked;
   }
 
-  exportBtn.disabled = true;
+  setButtonsDisabled(true);
   setStatus("Exporting...", "status-working");
 
   try {
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-
-    let tabOrigin = "";
-    try { tabOrigin = new URL(tab?.url ?? "").origin; } catch { /* invalid URL */ }
-    if (tabOrigin !== "https://claude.ai") {
+    const tab = await getActiveClaudeTab();
+    if (!tab) {
       setStatus("Navigate to claude.ai first", "status-error");
-      exportBtn.disabled = false;
+      setButtonsDisabled(false);
       return;
     }
 
@@ -152,7 +162,7 @@ exportBtn.addEventListener("click", async () => {
 
     if (!response?.success) {
       setStatus(response?.error || "Export failed", "status-error");
-      exportBtn.disabled = false;
+      setButtonsDisabled(false);
       return;
     }
 
@@ -170,5 +180,35 @@ exportBtn.addEventListener("click", async () => {
     setStatus((err instanceof Error ? err.message : String(err)) || "Export failed", "status-error");
   }
 
-  exportBtn.disabled = false;
+  setButtonsDisabled(false);
+});
+
+copyBtn.addEventListener("click", async () => {
+  setButtonsDisabled(true);
+  setStatus("Copying...", "status-working");
+
+  try {
+    const tab = await getActiveClaudeTab();
+    if (!tab) {
+      setStatus("Navigate to claude.ai first", "status-error");
+      setButtonsDisabled(false);
+      return;
+    }
+
+    const response = await chrome.tabs.sendMessage(tab.id!, { action: "copyChat" });
+
+    if (!response?.success) {
+      setStatus(response?.error || "Copy failed", "status-error");
+      setButtonsDisabled(false);
+      return;
+    }
+
+    await navigator.clipboard.writeText(response.markdown);
+    setStatus("Copied to clipboard", "status-success");
+  } catch (err: unknown) {
+    console.error("Copy error:", err);
+    setStatus((err instanceof Error ? err.message : String(err)) || "Copy failed", "status-error");
+  }
+
+  setButtonsDisabled(false);
 });
