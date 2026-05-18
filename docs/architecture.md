@@ -12,7 +12,7 @@ The repo produces one capability — "render a Claude.ai conversation as
 Markdown, fetch its attachments, write the result somewhere" — and ships it
 through three surfaces:
 
-- `cli/` — Node CLI, `claude-export <url>`
+- `cli/` — Node CLI, `claude-exporter <url>`
 - `obsidian-plugin/` — Obsidian plugin (modal, ribbon icon, per-note refresh button, Refresh-All modal)
 - `extension/` — Chrome MV3 extension (popup + content script)
 

@@ -1,17 +1,17 @@
 {
-  "name": "claude-ai-exporter",
+  "name": "claude-exporter",
   "version": "0.1.0",
   "description": "Export Claude.ai conversations to Markdown via CLI, Chrome extension, or Obsidian plugin.",
   "type": "module",
   "license": "MIT",
   "author": "Gleb Mishchenko <glebmish.dev@gmail.com> (https://github.com/glebmish)",
-  "homepage": "https://github.com/glebmish/claude-ai-exporter#readme",
+  "homepage": "https://github.com/glebmish/claude-exporter#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/glebmish/claude-ai-exporter.git"
+    "url": "git+https://github.com/glebmish/claude-exporter.git"
   },
   "bugs": {
-    "url": "https://github.com/glebmish/claude-ai-exporter/issues"
+    "url": "https://github.com/glebmish/claude-exporter/issues"
   },
   "keywords": [
     "claude",
@@ -32,7 +32,7 @@
     "dev:plugin": "node obsidian-plugin/esbuild.config.mjs"
   },
   "bin": {
-    "claude-export": "./cli/dist/main.mjs"
+    "claude-exporter": "./cli/dist/main.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

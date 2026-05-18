@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "description": "Export Claude.ai conversations to markdown with optional artifact extraction.",
   "author": "Gleb Mishchenko",
-  "homepage_url": "https://github.com/glebmish/claude-ai-exporter",
+  "homepage_url": "https://github.com/glebmish/claude-exporter",
   "permissions": ["activeTab", "storage", "downloads", "tabs", "scripting"],
   "host_permissions": ["https://claude.ai/*"],
   "background": {

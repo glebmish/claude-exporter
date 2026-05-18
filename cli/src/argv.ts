@@ -5,7 +5,7 @@ export type ArgvResult =
   | { kind: "ok"; opts: ExportOptions; json: boolean; debug: boolean; templatePath?: string }
   | { kind: "error"; message: string };
 
-const USAGE = `Usage: claude-export <chat-url-or-id> [flags]
+const USAGE = `Usage: claude-exporter <chat-url-or-id> [flags]
 
 Layout:
   -o, --output-dir <dir>              Note directory (default: .)

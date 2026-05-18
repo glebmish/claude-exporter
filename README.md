@@ -1,6 +1,6 @@
 # Claude AI Exporter
 
-[![CI](https://github.com/glebmish/claude-ai-exporter/actions/workflows/ci.yml/badge.svg)](https://github.com/glebmish/claude-ai-exporter/actions/workflows/ci.yml)
+[![CI](https://github.com/glebmish/claude-exporter/actions/workflows/ci.yml/badge.svg)](https://github.com/glebmish/claude-exporter/actions/workflows/ci.yml)
 
 Export Claude.ai conversations to Markdown straight into your Obsidian vault — or, if you prefer, via a CLI or a Chrome extension. Produces readable notes with artifacts, tool use, citations, and an optional AI-generated table of contents.
 
@@ -24,7 +24,7 @@ Export Claude.ai conversations to Markdown straight into your Obsidian vault —
 | | What it is | For |
 |---|---|---|
 | **Obsidian plugin** (`obsidian-plugin/`) | Exports directly into a vault, with per-note refresh and a Refresh-All modal | Keeping a searchable archive inside Obsidian |
-| **CLI** (`cli/`) | `claude-export <url>` in the terminal | Scripts, batch exports, one-off dumps |
+| **CLI** (`cli/`) | `claude-exporter <url>` in the terminal | Scripts, batch exports, one-off dumps |
 | **Chrome extension** (`extension/`) | Popup on claude.ai, downloads Markdown + artifacts | Quick manual exports while browsing |
 
 All three share the same converter, so output is consistent across them.
@@ -47,8 +47,8 @@ On first run, the tool launches a **separate Chrome profile** (empty, isolated f
 ## Install & build (from source)
 
 ```bash
-git clone https://github.com/glebmish/claude-ai-exporter.git
-cd claude-ai-exporter
+git clone https://github.com/glebmish/claude-exporter.git
+cd claude-exporter
 npm install
 ```
 
@@ -81,11 +81,11 @@ After `build:cli`, run the bundled entry directly:
 node cli/dist/main.mjs <chat-url-or-id> [flags]
 ```
 
-Or link it globally as `claude-export`:
+Or link it globally as `claude-exporter`:
 
 ```bash
 npm link
-claude-export <chat-url-or-id> [flags]
+claude-exporter <chat-url-or-id> [flags]
 ```
 
 Flags:

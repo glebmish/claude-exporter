@@ -50,7 +50,7 @@ async function fetchImage(url: string): Promise<string | null> {
   try {
     response = await fetch(url, { credentials: "include" });
   } catch (e) {
-    console.warn(`[claude-export] failed to fetch ${url}:`, e);
+    console.warn(`[claude-exporter] failed to fetch ${url}:`, e);
     return null;
   }
   if (!response.ok) return null;
@@ -131,7 +131,7 @@ async function downloadSandboxFile(
       { credentials: "include" },
     );
   } catch (e) {
-    console.warn(`[claude-export] failed to fetch sandbox file ${path}:`, e);
+    console.warn(`[claude-exporter] failed to fetch sandbox file ${path}:`, e);
     return null;
   }
   if (!response.ok) return null;
@@ -156,7 +156,7 @@ async function fetchAllSandboxFiles(
       { credentials: "include" },
     );
   } catch (e) {
-    console.warn("[claude-export] sandbox list-files failed:", e);
+    console.warn("[claude-exporter] sandbox list-files failed:", e);
     return [];
   }
   if (!listResp.ok) return [];

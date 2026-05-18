@@ -37,11 +37,11 @@ export class ExportModal extends Modal {
         setTimeout(() => text.inputEl.focus(), 50);
       });
 
-    const statusEl = contentEl.createEl("p", { cls: "claude-export-status" });
+    const statusEl = contentEl.createEl("p", { cls: "claude-exporter-status" });
     statusEl.style.fontStyle = "italic";
     statusEl.style.color = "var(--text-muted)";
 
-    const buttonContainer = contentEl.createDiv({ cls: "claude-export-buttons" });
+    const buttonContainer = contentEl.createDiv({ cls: "claude-exporter-buttons" });
     buttonContainer.style.display = "flex";
     buttonContainer.style.gap = "8px";
     buttonContainer.style.justifyContent = "flex-end";
