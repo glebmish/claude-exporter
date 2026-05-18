@@ -61,6 +61,9 @@ jobs:
       - name: Tests
         run: npm test
 
+      - name: Build CLI
+        run: npm run build:cli
+
       - name: Publish
         run: npm publish --provenance --access public
         env:
