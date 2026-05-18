@@ -44,27 +44,19 @@ All three share the same converter, so output is consistent across them.
 
 On first run, the tool launches a **separate Chrome profile** (empty, isolated from your main browser) and opens claude.ai. You log in once in that window; the session cookie stays in that profile for subsequent exports. Nothing is stored by the tool itself — no tokens, no credentials — and nothing leaves your machine. The Chrome instance is driven over the DevTools Protocol to read conversations as your logged-in browser would.
 
-## Install & build (from source)
-
-```bash
-git clone https://github.com/glebmish/claude-exporter.git
-cd claude-exporter
-npm install
-```
-
-Then build whichever consumer(s) you want:
-
-```bash
-npm run build:cli         # → cli/dist/main.mjs
-npm run build:extension   # → extension/dist/
-npm run build:plugin      # → obsidian-plugin/dist/ (main.js + manifest.json)
-```
-
-There's also `npm run dev:plugin` for watch-mode builds while iterating on the plugin, and `npm test` to run the test suite.
+## Install
 
 ### Obsidian plugin
 
-After `build:plugin`, copy the plugin files into your vault (**copy, not symlink** — symlinks break Obsidian Sync):
+Install via [**BRAT**](https://github.com/TfTHacker/obsidian42-brat) (the community beta-plugin installer):
+
+1. In Obsidian, install and enable the **BRAT** community plugin.
+2. **BRAT → Add Beta plugin** → paste `glebmish/claude-exporter` → **Add Plugin**.
+3. **Settings → Community plugins**, enable **Claude Exporter**.
+
+BRAT will pull the latest release and auto-update on subsequent versions. To use AI enrichment (TOC, recap, key topics), set the path to your local `claude` CLI in the plugin settings — see [AI enrichment](#ai-enrichment-optional).
+
+Or, build from source (see [Build from source](#build-from-source)) and copy the artifacts into your vault (**copy, not symlink** — symlinks break Obsidian Sync):
 
 ```bash
 mkdir -p <vault>/.obsidian/plugins/claude-exporter
@@ -94,7 +86,7 @@ Pin a specific version with `npx claude-exporter@0.1.0 …` if you need a reprod
 
 If `npx` can't find the binary, it usually means an older cached copy — run `npx --yes claude-exporter@latest …` to force a fresh fetch.
 
-Or, build from source (see [Install & build](#install--build-from-source)) and either run `node cli/dist/main.mjs <url>` directly or `npm link` to expose it as `claude-exporter` on your `PATH`.
+Or, build from source (see [Build from source](#build-from-source)) and either run `node cli/dist/main.mjs <url>` directly or `npm link` to expose it as `claude-exporter` on your `PATH`.
 
 Flags:
 
@@ -179,6 +171,24 @@ To enable:
 - Pick which enrichment you want via template variables (`{{toc}}`, `{{tocWithRecap}}`, `{{keyTopics}}`, `{{keyTopicsFlat}}`) or CLI flags (`--toc headers|recap`, `--topics`). The two surfaces are mutually exclusive: with `--template`, placeholders carry the intent
 
 Incremental re-export: when re-exporting a note that already has a TOC, existing entries are parsed and reused, and the model only runs if new messages were added. This keeps re-exports cheap and stable.
+
+## Build from source
+
+```bash
+git clone https://github.com/glebmish/claude-exporter.git
+cd claude-exporter
+npm install
+```
+
+Then build whichever consumer(s) you want:
+
+```bash
+npm run build:cli         # → cli/dist/main.mjs
+npm run build:extension   # → extension/dist/
+npm run build:plugin      # → obsidian-plugin/dist/ (main.js + manifest.json)
+```
+
+There's also `npm run dev:plugin` for watch-mode builds while iterating on the plugin, and `npm test` to run the test suite.
 
 ## Project layout
 

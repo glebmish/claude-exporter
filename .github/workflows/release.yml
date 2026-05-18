@@ -9,8 +9,39 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  create-release:
+    name: Verify versions and create GitHub release
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Verify tag matches all surface versions
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          pkg=$(node -p "require('./package.json').version")
+          plugin=$(node -p "require('./obsidian-plugin/manifest.json').version")
+          ext=$(node -p "require('./extension/manifest.json').version")
+          fail=0
+          for name in pkg plugin ext; do
+            val="${!name}"
+            if [ "$val" != "$tag" ]; then
+              echo "::error::$name version is $val, tag is v$tag" >&2
+              fail=1
+            fi
+          done
+          [ "$fail" = "0" ]
+
+      - name: Create GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --generate-notes
+
   publish-cli:
     name: Publish CLI to npm
+    needs: create-release
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -27,15 +58,6 @@ jobs:
 
       - run: npm ci
 
-      - name: Verify tag matches package.json version
-        run: |
-          tag="${GITHUB_REF_NAME#v}"
-          pkg=$(node -p "require('./package.json').version")
-          if [ "$tag" != "$pkg" ]; then
-            echo "Tag v$tag does not match package.json version $pkg" >&2
-            exit 1
-          fi
-
       - name: Tests
         run: npm test
 
@@ -43,3 +65,32 @@ jobs:
         run: npm publish --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  publish-plugin:
+    name: Attach Obsidian plugin assets to release
+    needs: create-release
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      - run: npm ci
+
+      - name: Build plugin
+        run: npm run build:plugin
+
+      - name: Upload plugin assets to release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release upload "$GITHUB_REF_NAME" \
+            obsidian-plugin/dist/main.js \
+            obsidian-plugin/dist/manifest.json \
+            --clobber
