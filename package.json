@@ -1,6 +1,6 @@
 {
   "name": "claude-exporter",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Export Claude.ai conversations to Markdown via CLI, Chrome extension, or Obsidian plugin.",
   "type": "module",
   "license": "MIT",
@@ -50,10 +50,10 @@
     "eslint": "^9.39.4",
     "obsidian": "^1.7.2",
     "typescript": "^5.7.0",
-    "typescript-eslint": "^8.59.3",
-    "ws": "^8.20.0"
+    "typescript-eslint": "^8.59.3"
   },
   "dependencies": {
-    "@anthropic-ai/claude-agent-sdk": "^0.2.81"
+    "@anthropic-ai/claude-agent-sdk": "^0.2.81",
+    "ws": "^8.20.0"
   }
 }

@@ -64,6 +64,18 @@ jobs:
       - name: Build CLI
         run: npm run build:cli
 
+      - name: Smoke test (pack + install + run in clean dir)
+        run: |
+          tarball=$(npm pack --silent)
+          workdir=$(mktemp -d)
+          (cd "$workdir" && npm init -y >/dev/null && npm install --omit=dev "$GITHUB_WORKSPACE/$tarball")
+          out=$("$workdir/node_modules/.bin/claude-exporter" 2>&1 || true)
+          echo "$out"
+          if echo "$out" | grep -qE "ERR_MODULE_NOT_FOUND|Cannot find package|Cannot find module"; then
+            echo "::error::Runtime module missing from published tarball — check dependencies vs devDependencies" >&2
+            exit 1
+          fi
+
       - name: Publish
         run: npm publish --provenance --access public
         env:
