@@ -276,7 +276,7 @@ describe("runExport — attachments layout", () => {
         },
       ],
     });
-    const result = await runExport(baseOpts, { fs, cdpOverride: cdp });
+    await runExport(baseOpts, { fs, cdpOverride: cdp });
     const files = fs.list();
     // upload at <attachmentsDir>/uploads/photo.png
     assert.ok(

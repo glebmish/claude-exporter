@@ -32,9 +32,7 @@ import {
   makeConversationWithImages,
   makeConversationWithPreviewAsset,
   makeConversationWithHtmlInTools,
-  makeConversationWithArtifactRewrite,
   makeConversationWithCreateFileUpdate,
-  makeConversationWithStandaloneCreateFile,
   makeConversationWithCitations,
   makeConversationWithDuplicateCitations,
 } from "./fixtures.ts";
@@ -136,6 +134,7 @@ describe("utility functions", () => {
       assert.equal(stripArchivePluginMarkers("Title hereLast message 1 month ago"), "Title here");
     });
     it("strips both — and handles the NBSP between 'message' and the digit (real Archive-plugin output)", () => {
+      // eslint-disable-next-line no-irregular-whitespace -- documenting the NBSP literal we strip
       //   is the non-breaking space the Archive plugin captures from the sidebar row.
       const polluted = "Sourdough hydration experimentsLast message 1 month ago ^archived";
       assert.equal(

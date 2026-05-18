@@ -25,6 +25,7 @@
   ],
   "scripts": {
     "test": "node --test --experimental-strip-types test/*.test.ts",
+    "lint": "eslint .",
     "build:cli": "node cli/esbuild.config.mjs production",
     "build:extension": "node extension/esbuild.config.mjs production",
     "build:plugin": "node obsidian-plugin/esbuild.config.mjs production",
@@ -37,8 +38,10 @@
     "@types/node": "^22.0.0",
     "@types/ws": "^8.18.1",
     "esbuild": "^0.25.0",
+    "eslint": "^9.39.4",
     "obsidian": "^1.7.2",
     "typescript": "^5.7.0",
+    "typescript-eslint": "^8.59.3",
     "ws": "^8.20.0"
   },
   "dependencies": {

@@ -18,6 +18,7 @@
  */
 
 const VARIABLE_RE = /\{\{(\w+)\}\}/g;
+// eslint-disable-next-line no-control-regex -- intentional: strip filesystem-illegal control bytes
 const UNSAFE_CHARS = /[<>:"/\\|?*\x00-\x1f]/g;
 
 // Common typographic Unicode characters get folded to ASCII so filenames stay

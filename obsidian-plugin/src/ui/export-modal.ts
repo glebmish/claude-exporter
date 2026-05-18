@@ -23,7 +23,6 @@ export class ExportModal extends Modal {
 
     let urlValue = "";
     let exportBtn: HTMLButtonElement;
-    let statusEl: HTMLElement;
 
     new Setting(contentEl)
       .setName("Chat URL")
@@ -38,7 +37,7 @@ export class ExportModal extends Modal {
         setTimeout(() => text.inputEl.focus(), 50);
       });
 
-    statusEl = contentEl.createEl("p", { cls: "claude-export-status" });
+    const statusEl = contentEl.createEl("p", { cls: "claude-export-status" });
     statusEl.style.fontStyle = "italic";
     statusEl.style.color = "var(--text-muted)";
 
