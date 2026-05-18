@@ -75,18 +75,26 @@ Then in **Settings → Community plugins**, enable **Claude Exporter**.
 
 ### CLI
 
-After `build:cli`, run the bundled entry directly:
+Run without installing:
 
 ```bash
-node cli/dist/main.mjs <chat-url-or-id> [flags]
+npx claude-exporter <chat-url-or-id> [flags]
 ```
 
-Or link it globally as `claude-exporter`:
+Or install globally:
 
 ```bash
-npm link
+npm install -g claude-exporter
 claude-exporter <chat-url-or-id> [flags]
 ```
+
+Requires **Node 18 or newer**. Chrome (or another Chromium build) must be installed; the CLI launches it in a separate profile — see [How authentication works](#how-authentication-works).
+
+Pin a specific version with `npx claude-exporter@0.1.0 …` if you need a reproducible build. For day-to-day use, `npx claude-exporter@latest …` is fine.
+
+If `npx` can't find the binary, it usually means an older cached copy — run `npx --yes claude-exporter@latest …` to force a fresh fetch.
+
+Or, build from source (see [Install & build](#install--build-from-source)) and either run `node cli/dist/main.mjs <url>` directly or `npm link` to expose it as `claude-exporter` on your `PATH`.
 
 Flags:
 

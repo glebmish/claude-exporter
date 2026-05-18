@@ -29,10 +29,19 @@
     "build:cli": "node cli/esbuild.config.mjs production",
     "build:extension": "node extension/esbuild.config.mjs production",
     "build:plugin": "node obsidian-plugin/esbuild.config.mjs production",
-    "dev:plugin": "node obsidian-plugin/esbuild.config.mjs"
+    "dev:plugin": "node obsidian-plugin/esbuild.config.mjs",
+    "prepublishOnly": "npm run build:cli"
   },
   "bin": {
     "claude-exporter": "./cli/dist/main.mjs"
+  },
+  "files": [
+    "cli/dist/main.mjs",
+    "LICENSE",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=18"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
