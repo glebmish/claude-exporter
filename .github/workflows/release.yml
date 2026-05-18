@@ -94,3 +94,53 @@ jobs:
             obsidian-plugin/dist/main.js \
             obsidian-plugin/dist/manifest.json \
             --clobber
+
+  publish-extension:
+    name: Attach Chrome extension bundle to release
+    needs: create-release
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      - run: npm ci
+
+      - name: Build extension
+        run: npm run build:extension
+
+      - name: Assemble loadable bundle
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          bundle="claude-exporter-extension-v${version}"
+          mkdir -p "$bundle/dist" "$bundle/icons"
+          cp extension/manifest.json "$bundle/"
+          cp extension/background.js "$bundle/"
+          cp extension/popup.html extension/settings.html "$bundle/"
+          cp extension/settings.css extension/styles.css "$bundle/"
+          cp extension/settings.js "$bundle/"
+          cp extension/jszip.min.js "$bundle/"
+          cp extension/icons/icon*.png "$bundle/icons/"
+          cp extension/dist/content.js extension/dist/popup.js "$bundle/dist/"
+          # Reject if any sourcemaps slipped in
+          if find "$bundle" -name '*.map' | grep -q .; then
+            echo "::error::sourcemaps present in production bundle" >&2
+            exit 1
+          fi
+          zip -r "${bundle}.zip" "$bundle"
+          ls -la "${bundle}.zip"
+
+      - name: Upload extension bundle to release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          gh release upload "$GITHUB_REF_NAME" \
+            "claude-exporter-extension-v${version}.zip" \
+            --clobber

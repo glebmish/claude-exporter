@@ -118,12 +118,18 @@ Constraints:
 
 ### Chrome extension
 
-After `build:extension`:
+Install the prebuilt bundle:
 
-1. Open `chrome://extensions`
-2. Enable **Developer mode**
-3. Click **Load unpacked** and select the `extension/` directory
-4. Click the extension icon on any `claude.ai/chat/...` page
+1. Download `claude-exporter-extension-<version>.zip` from the [latest release](https://github.com/glebmish/claude-exporter/releases/latest).
+2. Unzip it somewhere stable (don't delete the folder — Chrome reads from it on every startup).
+3. Open `chrome://extensions`, enable **Developer mode** (top right), click **Load unpacked**, and select the unzipped folder.
+4. On any `claude.ai/chat/...` page, click the extension icon — the popup downloads the conversation as Markdown (with artifacts zipped alongside).
+
+Requires **Chrome 88 or newer** (Manifest V3). The extension stores no data on disk; export settings live in `chrome.storage.sync`.
+
+If Chrome shows "Manifest file is missing or unreadable" after Load unpacked, you likely selected the parent folder — make sure the folder you pick contains `manifest.json` directly.
+
+Or, build from source (see [Build from source](#build-from-source)) and load the `extension/` directory directly. After `build:extension`, the source dir is itself a valid unpacked-loadable folder (the manifest references `dist/content.js`, which the build produces in place).
 
 ## Template system
 
