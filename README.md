@@ -1,21 +1,11 @@
-# Claude AI Exporter
+# Claude Exporter
 
 [![CI](https://github.com/glebmish/claude-exporter/actions/workflows/ci.yml/badge.svg)](https://github.com/glebmish/claude-exporter/actions/workflows/ci.yml)
+[![npm version](https://img.shields.io/npm/v/claude-exporter.svg)](https://www.npmjs.com/package/claude-exporter)
+[![npm downloads](https://img.shields.io/npm/dm/claude-exporter.svg)](https://www.npmjs.com/package/claude-exporter)
+[![License: MIT](https://img.shields.io/github/license/glebmish/claude-exporter.svg)](LICENSE)
 
 Export Claude.ai conversations to Markdown straight into your Obsidian vault — or, if you prefer, via a CLI or a Chrome extension. Produces readable notes with artifacts, tool use, citations, and an optional AI-generated table of contents.
-
-<!--
-  📺 Demo
-
-  TODO: drop a GIF or short MP4 of the Obsidian plugin in action here.
-  Suggested flow: open a Claude chat → run "Export current Claude chat" command →
-  show the rendered note in the vault with TOC, callouts, and artifacts.
-
-  Replace this comment with:
-    ![demo](./docs/demo.gif)
-  or:
-    <video src="./docs/demo.mp4" controls></video>
--->
 
 > **Demo:** _coming soon — GIF/video walkthrough of the Obsidian plugin._
 
@@ -23,30 +13,24 @@ Export Claude.ai conversations to Markdown straight into your Obsidian vault —
 
 | | What it is | For |
 |---|---|---|
-| **Obsidian plugin** (`obsidian-plugin/`) | Exports directly into a vault, with per-note refresh and a Refresh-All modal | Keeping a searchable archive inside Obsidian |
+| **Obsidian plugin** (`obsidian-plugin/`) | Exports directly into a vault | Keeping a searchable archive inside Obsidian |
 | **CLI** (`cli/`) | `claude-exporter <url>` in the terminal | Scripts, batch exports, one-off dumps |
 | **Chrome extension** (`extension/`) | Popup on claude.ai, downloads Markdown + artifacts | Quick manual exports while browsing |
 
 All three share the same converter, so output is consistent across them.
 
-## Features
+## Obsidian
 
-- Markdown rendering in two flavors: **standard** (plain) and **Obsidian** (callouts, wikilink anchors)
-- Artifact extraction — each artifact written as a separate file, linked from the note
-- Inline citations + a consolidated links section, with each link annotated by the tool that surfaced it (`web_search`, `web_fetch`, …)
-- Tool use rendered as a collapsible callout, with execution duration and MCP integration name when the conversation API exposes them
-- Active-branch filtering — when you edited a message and retried, only the branch you actually kept ends up in the exported note
-- Template system with named variables — customize the note layout without touching code
-- Optional AI enrichment — table of contents, per-topic recap, and key topics
-- Incremental re-export — only new messages are rendered; existing AI-generated TOC entries are reused
+### What it offers
 
-## How authentication works
+- **Export Claude Chat** button - export by URL or select chat in the browser manually.
+- **Refresh-All modal** — re-export every Claude note in a folder in one go.
+- **Refresh button** — a refresh icon on any exported note re-runs the export in place and incrementally updates AI-generated TOC.
+- **Vault-aware artifact placement** — artifacts land in a separate vault folder you choose, linked from the note.
+- **Obsidian markdown flavor** - callouts for thinking blocks and tool use, wikilinks to artifacts.
+- **Template support** for note name and content.
 
-On first run, the tool launches a **separate Chrome profile** (empty, isolated from your main browser) and opens claude.ai. You log in once in that window; the session cookie stays in that profile for subsequent exports. Nothing is stored by the tool itself — no tokens, no credentials — and nothing leaves your machine. The Chrome instance is driven over the DevTools Protocol to read conversations as your logged-in browser would.
-
-## Install
-
-### Obsidian plugin
+### Install
 
 Install via [**BRAT**](https://github.com/TfTHacker/obsidian42-brat) (the community beta-plugin installer):
 
@@ -54,7 +38,7 @@ Install via [**BRAT**](https://github.com/TfTHacker/obsidian42-brat) (the commun
 2. **BRAT → Add Beta plugin** → paste `glebmish/claude-exporter` → **Add Plugin**.
 3. **Settings → Community plugins**, enable **Claude Exporter**.
 
-BRAT will pull the latest release and auto-update on subsequent versions. To use AI enrichment (TOC, recap, key topics), set the path to your local `claude` CLI in the plugin settings — see [AI enrichment](#ai-enrichment-optional).
+BRAT will pull the latest release and auto-update on subsequent versions. To use AI enrichment, set the path to your local `claude` CLI in the plugin settings — see [AI enrichment](#ai-enrichment-optional).
 
 Or, build from source (see [Build from source](#build-from-source)) and copy the artifacts into your vault (**copy, not symlink** — symlinks break Obsidian Sync):
 
@@ -65,7 +49,46 @@ cp obsidian-plugin/dist/* <vault>/.obsidian/plugins/claude-exporter/
 
 Then in **Settings → Community plugins**, enable **Claude Exporter**.
 
-### CLI
+### Usage
+
+The plugin's three entry points:
+
+- **Export Claude chat** — opens a modal where you paste a `claude.ai/chat/...` URL. Click "Choose" to select chat in the a browser.
+- **Refresh exported chat** — re-export the currently-open note in place; incrementally updates any existing AI-generated TOC.
+- **Refresh all exported chats in folder** — opens the Refresh-All modal; review the list of detected exports, re-run them sequentially with progress.
+
+### Configuration
+
+Open **Settings → Community plugins → Claude Exporter** to configure:
+
+| Setting | Purpose |
+|---|---|
+| **Export folder** | Vault-relative path for exported chats |
+| **Artifacts folder** | Vault-relative path for artifact files |
+| **Chat file name** | Template for the note filename — see [Filename templates](#filename-templates) for variables |
+| **Artifact file name** | Template for artifact filenames — see [Filename templates](#filename-templates) for variables |
+| **Note template** | Vault path to a Markdown template file (e.g. `_templates/claude-chat.md`); blank uses the built-in format. See [Template system](#template-system) for variables. |
+| **Chrome path** | Override the auto-detected Chrome binary |
+| **Include thinking** | Include Claude's thinking/reasoning blocks |
+| **Include tool calls** | Include tool use details (search, web fetch, etc.) |
+| **AI Table of Contents** | Toggle AI enrichment; reveals a **Claude executable path** sub-setting where you paste the output of `which claude`. See [AI enrichment](#ai-enrichment-optional). |
+
+### Limitations
+
+- **Desktop Obsidian only.** The plugin is `isDesktopOnly: true` — no iOS/Android.
+- **Manual login on first run.** Same separate-profile Chrome model as the CLI — see [Access to claude.ai chats](#access-to-claudeai-chats).
+- **Requires Claude Code** installed and authorized for AI-enrichment
+
+## CLI
+
+### What it offers
+
+- Machine-readable **`--json`** output for piping into shell scripts and other tools.
+- **`--existing`** flag for driving incremental re-export from outside Obsidian (the plugin uses the same code path internally).
+- Support for simple markdown and Obsidian flavor
+- Full coverage of Obsidian plugin features to import to a vault programmatically
+
+### Install
 
 Run without installing:
 
@@ -80,56 +103,107 @@ npm install -g claude-exporter
 claude-exporter <chat-url-or-id> [flags]
 ```
 
-Requires **Node 18 or newer**. Chrome (or another Chromium build) must be installed; the CLI launches it in a separate profile — see [How authentication works](#how-authentication-works).
-
-Pin a specific version with `npx claude-exporter@0.1.0 …` if you need a reproducible build. For day-to-day use, `npx claude-exporter@latest …` is fine.
-
-If `npx` can't find the binary, it usually means an older cached copy — run `npx --yes claude-exporter@latest …` to force a fresh fetch.
+Requires **Node 18 or newer**. Chrome (or another Chromium build) must be installed; the CLI launches it in a separate profile — see [Access to claude.ai chats](#access-to-claudeai-chats).
 
 Or, build from source (see [Build from source](#build-from-source)) and either run `node cli/dist/main.mjs <url>` directly or `npm link` to expose it as `claude-exporter` on your `PATH`.
 
-Flags:
+### Examples
 
-| Flag | Meaning |
-|---|---|
-| `--output-dir <dir>`, `-o` | Note directory (default: current dir) |
-| `--attachments-dir <dir>` | Override attachments destination (defaults alongside the note) |
-| `--format standard\|obsidian` | Markdown flavor (default: `standard`) |
-| `--template <path>` | Path to a markdown template file (`{{title}}`, `{{header}}`, `{{content}}`, `{{toc}}`, etc.) |
-| `--chat-name <name>` | Literal chat filename (no `{{var}}` substitution) |
-| `--chat-name-template <tpl>` | Templated chat filename (default `{{created}} {{title}}`) — see "Filename templates" below |
-| `--artifact-name-template <tpl>` | Templated artifact filename (default `{{seqNum}} {{title}}`) |
-| `--no-artifacts` | Skip artifact files |
-| `--no-images` | Skip inline image fetch (images are fetched by default) |
-| `--thinking` | Include the assistant's thinking blocks |
-| `--tools` | Include tool-call details |
-| `--toc headers\|recap` | AI table of contents — `headers` for plain headings, `recap` for per-topic summaries (requires the `claude` CLI to be installed and logged in) |
-| `--topics` | Generate a key-topics list |
-| `--existing <file>` | Reuse TOC and key-topics from an existing export; stale attachments under the same datedTitle are cleaned. While running, the `{{exported}}`-bound frontmatter key is patched to `updating` so concurrent readers don't pick up the stale file |
-| `--json` | Machine-readable single-object stdout; logs go to stderr |
-| `--debug` | Verbose logging to stderr |
-| `--chrome-path <path>` | Path to Chrome binary (env: `CHROME_PATH`) |
-| `--chrome-port <n>` | CDP port (default 9222) |
+```bash
+# Full list of arguments
+claude-exporter --help
 
-Constraints:
+# Quickest start — export one chat into the current folder
+npx claude-exporter https://claude.ai/chat/abc-123
 
-- `--chat-name` and `--chat-name-template` are mutually exclusive.
-- `--template` cannot be combined with `--toc` or `--topics` — when using a template, declare enrichment via the `{{toc}}`, `{{tocWithRecap}}`, `{{keyTopics}}`, or `{{keyTopicsFlat}}` placeholders in the template body instead.
+# Text-only — skip artifact files and inline images
+npx claude-exporter https://claude.ai/chat/abc-123 --no-artifacts --no-images
 
-### Chrome extension
+# Full transcript — include assistant thinking blocks and tool-call details
+npx claude-exporter https://claude.ai/chat/abc-123 --thinking --tools
+
+# Custom Markdown layout via a template file
+npx claude-exporter https://claude.ai/chat/abc-123 --template ./my-template.md
+
+# AI table of contents with per-topic recaps
+# (requires the `claude` CLI installed and logged in — see "AI enrichment" below)
+npx claude-exporter https://claude.ai/chat/abc-123 --toc recap
+
+# Full Obsidian-plugin simulation: vault output, Obsidian flavor, custom
+# template with enrichment placeholders, attachments redirected to a shared
+# Attachments folder
+npx claude-exporter https://claude.ai/chat/abc-123 \
+  -o ~/vault/Claude \
+  --attachments-dir ~/vault/Claude/Attachments \
+  --format obsidian \
+  --template ~/vault/Claude/_claude-template.md
+```
+
+### Limitations
+
+- **Manual login on first run.** The first export pops up a Chrome window for an interactive sign-in; subsequent exports reuse the profile cookie until it expires.
+- **Requires Chrome on disk.** No headless fallback and no built-in Chromium. Point `--chrome-path` (or `CHROME_PATH`) at any Chromium build if Chrome isn't your default.
+- **Requires Claude Code** installed and authorized for AI-enrichment
+
+## Chrome extension
+
+### What it offers
+
+- **Copy chat** button alongside — paste the rendered Markdown directly without saving to disk.
+- **Export** as a single-file download: `.md` file plus artifacts in a single archive.
+
+### Install
 
 Install the prebuilt bundle:
 
 1. Download `claude-exporter-extension-<version>.zip` from the [latest release](https://github.com/glebmish/claude-exporter/releases/latest).
 2. Unzip it somewhere stable (don't delete the folder — Chrome reads from it on every startup).
 3. Open `chrome://extensions`, enable **Developer mode** (top right), click **Load unpacked**, and select the unzipped folder.
-4. On any `claude.ai/chat/...` page, click the extension icon — the popup downloads the conversation as Markdown (with artifacts zipped alongside).
-
-Requires **Chrome 88 or newer** (Manifest V3). The extension stores no data on disk; export settings live in `chrome.storage.sync`.
 
 If Chrome shows "Manifest file is missing or unreadable" after Load unpacked, you likely selected the parent folder — make sure the folder you pick contains `manifest.json` directly.
 
 Or, build from source (see [Build from source](#build-from-source)) and load the `extension/` directory directly. After `build:extension`, the source dir is itself a valid unpacked-loadable folder (the manifest references `dist/content.js`, which the build produces in place).
+
+### Usage
+
+1. Make sure you're signed in to claude.ai in the same browser profile.
+2. Navigate to any `claude.ai/chat/...` page.
+3. Click the **Claude Exporter** icon in the toolbar.
+4. In the popup, toggle the per-export options and click **Export** to download, or **Copy chat** to put the rendered Markdown on your clipboard.
+
+The export drops a `.md` file in your configured Downloads subdir, with artifacts bundled into a sibling `.zip` when **Include artifacts** is on.
+
+### Configuration
+
+Open the extension's settings page (gear icon in the popup, or `chrome://extensions` → **Details → Extension options**):
+
+| Setting | Purpose |
+|---|---|
+| **Output directory** | Subdirectory within your Downloads folder. Default: `claude-chats`. |
+
+Per-export toggles in the popup (not persisted across exports — set them each time):
+
+- **Include artifacts** (default on)
+- **Include thinking**
+- **Include tool calls**
+
+### Limitations
+
+- **Active tab only.** The popup exports whichever chat is open in the current tab; no batch UI. For bulk, use the CLI or the plugin's Refresh-All modal.
+
+## Access to claude.ai chats
+
+The exporter reads conversations by capturing Claude's own backend JSON responses — the same payloads the web app receives when it renders your chat. It does not screen-scrape rendered HTML or simulate clicks. Two different paths get those requests authenticated, depending on which surface you use.
+
+Nothing is stored by the tool itself — no tokens, no credentials — and nothing leaves your machine. All three surfaces read Anthropic's **internal** conversation endpoint; there is no SLA on its shape, so a schema change upstream will break exports until the converter is updated.
+
+### CLI and Obsidian plugin
+
+On first run, the tool launches a **separate Chrome profile** (empty, isolated from your main browser) and opens claude.ai. You log in once in that window; the session cookie stays in that profile for subsequent exports. The Chrome instance is driven over the DevTools Protocol, so requests to the conversation endpoint carry the same cookie a real browser would.
+
+### Chrome extension
+
+The extension runs inside your normal browser session — no separate profile, no extra login. As long as you're signed in to claude.ai in the tab where you click the popup, the extension reuses that session directly.
 
 ## Template system
 
@@ -168,13 +242,13 @@ Extensions are appended automatically. Unknown variables (e.g. typos like `{{tti
 
 ## AI enrichment (optional)
 
-The TOC, recap, and key-topics features use the [Claude Agent SDK](https://www.npmjs.com/package/@anthropic-ai/claude-agent-sdk) with the `claude-haiku-4-5` model. Authentication is delegated to the local [`claude` CLI](https://docs.claude.com/en/docs/claude-code/overview) — whichever account you're logged into there is what gets used. No API key needs to be set anywhere in this tool.
+The TOC, recap, and key-topics features use the [Claude Agent SDK](https://www.npmjs.com/package/@anthropic-ai/claude-agent-sdk) with the `claude-haiku-4-5` model. Authentication is delegated to the local [`claude` CLI](https://docs.claude.com/en/docs/claude-code/overview) — whichever account you're logged into there is what gets used. No API key needs to be set anywhere in this tool. The feature is **opt-in**: without the `claude` CLI installed and logged in, enrichment flags and template placeholders render empty.
 
 To enable:
 
-- Install the `claude` CLI and log in (`claude` → follow prompts)
+- Install the `claude` CLI and log in (`claude` → follow prompts).
 - In the Obsidian plugin, set the path to the `claude` executable in settings (e.g. the output of `which claude`). For the CLI, `claude` just needs to be on `PATH`.
-- Pick which enrichment you want via template variables (`{{toc}}`, `{{tocWithRecap}}`, `{{keyTopics}}`, `{{keyTopicsFlat}}`) or CLI flags (`--toc headers|recap`, `--topics`). The two surfaces are mutually exclusive: with `--template`, placeholders carry the intent
+- Pick which enrichment you want via template variables (`{{toc}}`, `{{tocWithRecap}}`, `{{keyTopics}}`, `{{keyTopicsFlat}}`) or CLI flags (`--toc headers|recap`, `--topics`). The two surfaces are mutually exclusive: with `--template`, placeholders carry the intent.
 
 Incremental re-export: when re-exporting a note that already has a TOC, existing entries are parsed and reused, and the model only runs if new messages were added. This keeps re-exports cheap and stable.
 
@@ -193,8 +267,6 @@ npm run build:cli         # → cli/dist/main.mjs
 npm run build:extension   # → extension/dist/
 npm run build:plugin      # → obsidian-plugin/dist/ (main.js + manifest.json)
 ```
-
-There's also `npm run dev:plugin` for watch-mode builds while iterating on the plugin, and `npm test` to run the test suite.
 
 ## Project layout
 
