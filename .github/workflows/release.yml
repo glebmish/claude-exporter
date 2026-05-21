@@ -64,6 +64,9 @@ jobs:
       - name: Build CLI
         run: npm run build:cli
 
+      - name: Swap in CLI-focused README for the npm tarball
+        run: cp cli/README.md README.md
+
       - name: Smoke test (pack + install + run in clean dir)
         run: |
           tarball=$(npm pack --silent)
