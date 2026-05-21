@@ -71,7 +71,8 @@ export class ExportModal extends Modal {
         const { conversationId, cdp, child } = await browseAndPick(
           this.settings,
           (msg) => { statusEl.textContent = msg; },
-          this.abortController.signal
+          this.abortController.signal,
+          (c) => { this.browseChild = c; },
         );
         this.browseChild = child;
         this.browseCdp = cdp;

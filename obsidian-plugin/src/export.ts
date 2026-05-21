@@ -108,6 +108,7 @@ export async function browseAndPick(
   settings: ExportSettings,
   onStatus: StatusCallback,
   signal?: AbortSignal,
+  onChildLaunched?: (child: import("child_process").ChildProcess | null) => void,
 ): Promise<{
   conversationId: string;
   cdp: CdpClient;
@@ -121,6 +122,17 @@ export async function browseAndPick(
     const chromePath = findChrome(settings.chromePath);
     child = launchChrome(chromePath, "https://claude.ai");
   }
+
+  // Hand the child to the caller before the first await so it can be cleaned
+  // up even if this function never returns (modal closes mid-await, Obsidian
+  // quits, etc.) — see export-modal's onClose path.
+  onChildLaunched?.(child);
+
+  // Fire shutdown the instant the signal aborts, without waiting for the
+  // currently in-flight await (cdp.evaluate, sleep) to unwind. The catch
+  // below remains as a backstop for non-abort errors.
+  const onAbort = () => { if (child) shutdownChrome(child); };
+  signal?.addEventListener("abort", onAbort, { once: true });
 
   let cdp: CdpClient | null = null;
   try {
@@ -152,5 +164,7 @@ export async function browseAndPick(
     if (cdp) cdp.close();
     if (child) shutdownChrome(child);
     throw err;
+  } finally {
+    signal?.removeEventListener("abort", onAbort);
   }
 }
