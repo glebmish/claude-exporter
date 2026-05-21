@@ -33,7 +33,7 @@
     "prepublishOnly": "npm run build:cli"
   },
   "bin": {
-    "claude-exporter": "./cli/dist/main.mjs"
+    "claude-exporter": "cli/dist/main.mjs"
   },
   "files": [
     "cli/dist/main.mjs",
