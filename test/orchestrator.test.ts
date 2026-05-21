@@ -545,6 +545,34 @@ describe("runExport — refresh path", () => {
       /requires/,
     );
   });
+
+  it("sanitizes malicious upload basenames: no .. segments, no separators, write stays inside attachments dir", async () => {
+    const fs = new InMemoryFs();
+    const cdp = makeStubCdp({
+      conversation: baseConversation,
+      sandboxFiles: [{
+        path: "/mnt/user-data/uploads/..\\..\\..\\etc\\passwd",
+        contentType: "application/octet-stream",
+        base64: Buffer.from("MALICIOUS").toString("base64"),
+        created_at: "2026-01-15T09:59:00Z",
+      }],
+    });
+    await runExport(baseOpts, { fs, cdpOverride: cdp });
+
+    const files = fs.list();
+    const uploadFile = files.find((f) => f.includes("/uploads/"));
+    assert.ok(uploadFile, `expected an uploads/<name> file, got: ${files.join(", ")}`);
+    const basename = uploadFile!.split("/").pop()!;
+    assert.ok(!basename.includes(".."), `basename must not contain ..: ${basename}`);
+    assert.ok(!basename.includes("\\"), `basename must not contain \\: ${basename}`);
+    assert.ok(!basename.includes("/"), `basename must not contain /: ${basename}`);
+    // The whole write path must stay under the chat's attachments dir.
+    const attachmentsDir = "out/2026-01-15 Test Chat";
+    assert.ok(
+      uploadFile!.startsWith(`${attachmentsDir}/`),
+      `write path must stay inside ${attachmentsDir}, got: ${uploadFile}`,
+    );
+  });
 });
 
 describe("runExport — flag-gated default rendering", () => {

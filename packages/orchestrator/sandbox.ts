@@ -65,6 +65,13 @@ function basename(path: string): string {
   return idx === -1 ? path : path.slice(idx + 1);
 }
 
+export function sanitizeUploadBasename(name: string): string {
+  const cleaned = sanitizeForFilename(name)
+    .replace(/\.\.+/g, ".")
+    .replace(/[\\/]/g, "");
+  return cleaned || "upload";
+}
+
 function splitExt(name: string): { stem: string; ext: string } {
   const i = name.lastIndexOf(".");
   if (i <= 0) return { stem: name, ext: "" };
@@ -183,9 +190,11 @@ export async function fetchSandboxFiles(
 
     // Apply user's artifact-name template (default: "{{seqNum}} {{title}}").
     // Uploads keep the original basename — they're user-supplied content, not
-    // Claude artifacts; renaming would obscure user intent.
+    // Claude artifacts; renaming would obscure user intent. Sanitize anyway: a
+    // malicious upload name with .. or path separators must not escape the
+    // attachments dir.
     const filename =
-      kind === "upload" ? rawName : computeFilename(rawName, text, seqNum, naming);
+      kind === "upload" ? sanitizeUploadBasename(rawName) : computeFilename(rawName, text, seqNum, naming);
     const relativeWritePath = relativeWritePathFor(kind, filename);
 
     const entry: SandboxFileContent = {
