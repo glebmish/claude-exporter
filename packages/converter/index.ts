@@ -760,13 +760,20 @@ export function parseConversation(
   };
 }
 
+const YAML_NEWLINES = new RegExp("[\\r\\n\\u2028\\u2029]+", "g");
+function yamlSingleLineScalar(s: string): string {
+  const flat = s.replace(YAML_NEWLINES, " ");
+  const escaped = flat.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+  return `"${escaped}"`;
+}
+
 export function renderDefault(result: ConversationResult): string {
   const lines: string[] = [];
 
   lines.push("---");
-  lines.push(`title: "${result.title.replace(/"/g, '\\"')}"`);
-  lines.push(`source: ${result.url}`);
-  lines.push(`model: ${result.model}`);
+  lines.push(`title: ${yamlSingleLineScalar(result.title)}`);
+  lines.push(`source: ${yamlSingleLineScalar(result.url)}`);
+  lines.push(`model: ${yamlSingleLineScalar(result.model)}`);
   lines.push(`created: ${result.created}`);
   lines.push(`updated: ${result.updated}`);
   lines.push(`exported: ${result.exported}`);

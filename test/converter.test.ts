@@ -386,8 +386,8 @@ describe("buildMarkdown", () => {
       const data = makeMinimalConversation();
       const { markdown } = buildMarkdown(data, {});
       assert.ok(markdown.includes('title: "Test Conversation"'));
-      assert.ok(markdown.includes("source: https://claude.ai/chat/conv-001"));
-      assert.ok(markdown.includes("model: claude-opus-4-6"));
+      assert.ok(markdown.includes('source: "https://claude.ai/chat/conv-001"'));
+      assert.ok(markdown.includes('model: "claude-opus-4-6"'));
     });
 
     it("includes message count", () => {
@@ -954,7 +954,7 @@ describe("renderDefault", () => {
   it("includes source url in frontmatter", () => {
     const result = parseConversation(makeMinimalConversation(), {});
     const md = renderDefault(result);
-    assert.ok(md.includes("source: https://claude.ai/chat/conv-001"));
+    assert.ok(md.includes('source: "https://claude.ai/chat/conv-001"'));
   });
 
   it("omits artifacts line when count is zero", () => {
@@ -983,6 +983,27 @@ describe("renderDefault", () => {
     const result = parseConversation(makeMinimalConversation(), {});
     const md = renderDefault(result);
     assert.ok(md.includes("Hello Claude"));
+  });
+
+  it("escapes newlines in title to prevent YAML injection", () => {
+    const data = makeMinimalConversation({ name: "Innocent\n bad_key: true \n---\nmore" });
+    const result = parseConversation(data, {});
+    const md = renderDefault(result);
+    // Frontmatter is the first --- ... --- block.
+    const fmMatch = md.match(/^---\n([\s\S]*?)\n---/);
+    assert.ok(fmMatch, "expected a frontmatter block");
+    const fm = fmMatch![1];
+    // bad_key must appear ONLY inside the title scalar, never on its own line.
+    const lines = fm.split("\n");
+    const ownLine = lines.find((l) => /^bad_key:/.test(l));
+    assert.equal(ownLine, undefined, `bad_key must not be a top-level key, got line: ${ownLine}`);
+    // And the rendered title line must still contain the substring as part of the scalar.
+    const titleLine = lines.find((l) => l.startsWith("title:"));
+    assert.ok(titleLine, "expected a title: line");
+    assert.ok(titleLine!.includes("bad_key: true"), `title line must carry the injected text inline, got: ${titleLine}`);
+    // Exactly the expected top-level keys: title, source, model, created, updated, exported, messages.
+    const topKeys = lines.filter((l) => /^[a-z]+:/i.test(l)).map((l) => l.split(":")[0]);
+    assert.deepEqual(topKeys.sort(), ["created", "exported", "messages", "model", "source", "title", "updated"]);
   });
 });
 
