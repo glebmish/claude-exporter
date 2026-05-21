@@ -156,7 +156,7 @@ npx claude-exporter https://claude.ai/chat/abc-123 \
 
 Install the prebuilt bundle:
 
-1. Download `claude-exporter-extension-<version>.zip` from the [latest release](https://github.com/glebmish/claude-exporter/releases/latest).
+1. Download `claude-exporter-extension-v<version>.zip` (e.g. `claude-exporter-extension-v0.1.2.zip`) from the [latest release](https://github.com/glebmish/claude-exporter/releases/latest).
 2. Unzip it somewhere stable (don't delete the folder — Chrome reads from it on every startup).
 3. Open `chrome://extensions`, enable **Developer mode** (top right), click **Load unpacked**, and select the unzipped folder.
 
@@ -277,6 +277,7 @@ obsidian-plugin/      Obsidian plugin (UI, export orchestration, settings)
 packages/
   converter/          Conversation JSON → Markdown, template substitution
   chrome/             Separate-profile Chrome lifecycle + CDP WebSocket client
+  orchestrator/       Wires converter + chrome + vault into the runExport pipeline
   toc/                AI enrichment via Claude Agent SDK (Haiku)
 test/                 Node test runner suites + fixtures
 ```
@@ -288,6 +289,10 @@ Contributor-facing notes on how the pieces fit together:
 - [docs/architecture.md](docs/architecture.md) — module boundaries, the export pipeline, and how the three surfaces share the converter.
 - [docs/claude-ai-api.md](docs/claude-ai-api.md) — shape of the upstream conversation JSON the converter reads, and the fetch path.
 - [docs/sandbox-files.md](docs/sandbox-files.md) — how artifact sandbox files are resolved, named, and placed.
+
+## Changelog
+
+Release notes live on the [GitHub Releases page](https://github.com/glebmish/claude-exporter/releases).
 
 ## License
 
