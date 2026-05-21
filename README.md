@@ -53,7 +53,7 @@ Then in **Settings → Community plugins**, enable **Claude Exporter**.
 
 The plugin's three entry points:
 
-- **Export Claude chat** — opens a modal where you paste a `claude.ai/chat/...` URL. Click "Choose" to select chat in the a browser.
+- **Export Claude chat** — opens a modal where you paste a `claude.ai/chat/...` URL, or click "Choose" to pick a chat in the browser.
 - **Refresh exported chat** — re-export the currently-open note in place; incrementally updates any existing AI-generated TOC.
 - **Refresh all exported chats in folder** — opens the Refresh-All modal; review the list of detected exports, re-run them sequentially with progress.
 
@@ -85,8 +85,8 @@ Open **Settings → Community plugins → Claude Exporter** to configure:
 
 - Machine-readable **`--json`** output for piping into shell scripts and other tools.
 - **`--existing`** flag for driving incremental re-export from outside Obsidian (the plugin uses the same code path internally).
-- Support for simple markdown and Obsidian flavor
-- Full coverage of Obsidian plugin features to import to a vault programmatically
+- Support for simple Markdown and Obsidian flavor
+- Drives the same export pipeline as the Obsidian plugin — every plugin feature is reachable from the command line for scripted vault imports
 
 ### Install
 
@@ -149,8 +149,8 @@ npx claude-exporter https://claude.ai/chat/abc-123 \
 
 ### What it offers
 
-- **Copy chat** button alongside — paste the rendered Markdown directly without saving to disk.
 - **Export** as a single-file download: `.md` file plus artifacts in a single archive.
+- **Copy chat** button — copy the rendered Markdown to the clipboard without saving to disk.
 
 ### Install
 
@@ -280,6 +280,14 @@ packages/
   toc/                AI enrichment via Claude Agent SDK (Haiku)
 test/                 Node test runner suites + fixtures
 ```
+
+## Internals
+
+Contributor-facing notes on how the pieces fit together:
+
+- [docs/architecture.md](docs/architecture.md) — module boundaries, the export pipeline, and how the three surfaces share the converter.
+- [docs/claude-ai-api.md](docs/claude-ai-api.md) — shape of the upstream conversation JSON the converter reads, and the fetch path.
+- [docs/sandbox-files.md](docs/sandbox-files.md) — how artifact sandbox files are resolved, named, and placed.
 
 ## License
 
